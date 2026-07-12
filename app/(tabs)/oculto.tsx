@@ -15,6 +15,7 @@ type Hito = {
   id: string;
   nombre: string;
   direccion_referencia: string | null;
+  hito_imagenes: { url: string; orden: number }[];
 };
 
 export default function OcultoScreen() {
@@ -25,7 +26,7 @@ export default function OcultoScreen() {
     async function cargarOcultos() {
       const { data } = await supabase
         .from("hitos")
-        .select("id, nombre, direccion_referencia")
+        .select("id, nombre, direccion_referencia, hito_imagenes(url, orden)")
         .eq("es_lugar_oculto", true) // <-- la única diferencia con home.tsx
         .order("nombre", { ascending: true });
 
@@ -58,7 +59,7 @@ export default function OcultoScreen() {
             onPress={() => router.push(`/hito/${hito.id}`)}
           >
             <Image
-              source={require("@/assets/images/partial-react-logo.png")}
+              source={obtenerImagenPrincipal(hito)}
               style={styles.imagenGrid}
             />
             <Text style={styles.nombreGrid} numberOfLines={2}>
@@ -76,6 +77,16 @@ export default function OcultoScreen() {
       <View style={{ height: 40 }} />
     </ScrollView>
   );
+}
+
+function obtenerImagenPrincipal(hito: Hito) {
+  if (hito.hito_imagenes && hito.hito_imagenes.length > 0) {
+    const ordenadas = [...hito.hito_imagenes].sort(
+      (a, b) => a.orden - b.orden,
+    );
+    return { uri: ordenadas[0].url };
+  }
+  return require("@/assets/images/partial-react-logo.png");
 }
 
 const styles = StyleSheet.create({

@@ -19,6 +19,7 @@ type Hito = {
   direccion_referencia: string | null;
   precio: number | null;
   categoria_id: number | null;
+  hito_imagenes: { url: string; orden: number }[];
 };
 
 type Categoria = {
@@ -72,7 +73,7 @@ export default function HomeScreen() {
       const { data } = await supabase
         .from("hitos")
         .select(
-          "id, nombre, direccion_referencia, precio, categoria_id, creado_en",
+          "id, nombre, direccion_referencia, precio, categoria_id, creado_en, hito_imagenes(url, orden)",
         )
         .eq("es_lugar_oculto", false)
         .order("creado_en", { ascending: true });
@@ -104,7 +105,7 @@ export default function HomeScreen() {
 
       let query = supabase
         .from("hitos")
-        .select("id, nombre, direccion_referencia, precio, categoria_id");
+        .select("id, nombre, direccion_referencia, precio, categoria_id, hito_imagenes(url, orden)");
 
       const texto = busqueda.trim();
       if (texto.length > 0) {
@@ -333,6 +334,16 @@ export default function HomeScreen() {
   );
 }
 
+function obtenerImagenPrincipal(hito: Hito) {
+  if (hito.hito_imagenes && hito.hito_imagenes.length > 0) {
+    const ordenadas = [...hito.hito_imagenes].sort(
+      (a, b) => a.orden - b.orden,
+    );
+    return { uri: ordenadas[0].url };
+  }
+  return require("@/assets/images/partial-react-logo.png");
+}
+
 function TarjetaCarrusel({ hito }: { hito: Hito }) {
   return (
     <TouchableOpacity
@@ -340,7 +351,7 @@ function TarjetaCarrusel({ hito }: { hito: Hito }) {
       onPress={() => router.push(`/hito/${hito.id}`)}
     >
       <Image
-        source={require("@/assets/images/partial-react-logo.png")}
+        source={obtenerImagenPrincipal(hito)}
         style={styles.imagenCarrusel}
       />
       <Text style={styles.nombreCarrusel} numberOfLines={1}>
@@ -357,7 +368,7 @@ function TarjetaGrid({ hito }: { hito: Hito }) {
       onPress={() => router.push(`/hito/${hito.id}`)}
     >
       <Image
-        source={require("@/assets/images/partial-react-logo.png")}
+        source={obtenerImagenPrincipal(hito)}
         style={styles.imagenGrid}
       />
       <Text style={styles.nombreGrid} numberOfLines={2}>

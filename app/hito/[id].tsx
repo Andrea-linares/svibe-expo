@@ -3,10 +3,14 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
+  FlatList,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View
 } from "react-native";
 
@@ -35,6 +39,10 @@ type ImagenHito = {
   orden: number;
 };
 
+const { width: ANCHO_PANTALLA } = Dimensions.get("window");
+const ALTURA_CARRUSEL = 260;
+const MAX_IMAGENES_CARRUSEL = 5;
+
 export default function DetalleHitoScreen() {
   // Recibimos el id que viene en la URL (ej: /hito/abc-123)
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,6 +51,9 @@ export default function DetalleHitoScreen() {
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [imagenes, setImagenes] = useState<ImagenHito[]>([]);
   const [cargando, setCargando] = useState(true);
+
+  const [indiceActual, setIndiceActual] = useState(0);
+  const [galeriaAbierta, setGaleriaAbierta] = useState(false);
 
   useEffect(() => {
     async function cargarDatos() {
@@ -95,17 +106,67 @@ export default function DetalleHitoScreen() {
 
   const estado = calcularEstado(horarios);
 
+  const imagenesCarrusel = imagenes.slice(0, MAX_IMAGENES_CARRUSEL);
+
   return (
     <ScrollView style={styles.contenedor}>
-      {/* Imagen principal (o placeholder si no hay imágenes aún) */}
-      <Image
-        source={
-          imagenes.length > 0
-            ? { uri: imagenes[0].url }
-            : require("@/assets/images/partial-react-logo.png") // placeholder temporal
-        }
-        style={styles.imagenPrincipal}
-      />
+      {/* 🔧 CAMBIO: bloque completo de imagen principal reemplazado por carrusel + botón de galería */}
+      {imagenes.length > 0 ? (
+        <View>
+          <FlatList
+            data={imagenesCarrusel}
+            keyExtractor={(item, i) => `${item.url}-${i}`}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const nuevoIndice = Math.round(
+                e.nativeEvent.contentOffset.x / ANCHO_PANTALLA,
+              );
+              setIndiceActual(nuevoIndice);
+            }}
+            renderItem={({ item }) => (
+              <Image
+                source={{ uri: item.url }}
+                style={[styles.imagenPrincipal, { width: ANCHO_PANTALLA }]}
+              />
+            )}
+          />
+
+          {/* Puntos indicadores del carrusel */}
+          {imagenesCarrusel.length > 1 && (
+            <View style={styles.puntosContenedor}>
+              {imagenesCarrusel.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.punto,
+                    i === indiceActual && styles.puntoActivo,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* Botón flotante: aparece al llegar a la última imagen del carrusel */}
+          {indiceActual === imagenesCarrusel.length - 1 && (
+            <TouchableOpacity
+              style={styles.botonGaleria}
+              onPress={() => setGaleriaAbierta(true)}
+            >
+              <Text style={styles.textoBotonGaleria}>
+                Ver galería completa
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        // Placeholder si no hay imágenes aún
+        <Image
+          source={require("@/assets/images/partial-react-logo.png")}
+          style={styles.imagenPrincipal}
+        />
+      )}
 
       <View style={styles.contenido}>
         {/* Título */}
@@ -196,9 +257,38 @@ export default function DetalleHitoScreen() {
           )}
         </ScrollView>
       </View>
+
+       <Modal
+        visible={galeriaAbierta}
+        animationType="slide"
+        onRequestClose={() => setGaleriaAbierta(false)}
+      >
+        <View style={styles.galeriaContenedor}>
+          <View style={styles.galeriaEncabezado}>
+            <TouchableOpacity onPress={() => setGaleriaAbierta(false)}>
+              <Text style={styles.galeriaVolver}>← Volver</Text>
+            </TouchableOpacity>
+            <Text style={styles.galeriaTitulo} numberOfLines={1}>
+              {hito.nombre}
+            </Text>
+            <View style={{ width: 50 }} />
+          </View>
+
+          <FlatList
+            data={imagenes}
+            keyExtractor={(item, i) => `${item.url}-${i}`}
+            numColumns={2}
+            contentContainerStyle={styles.galeriaGrid}
+            renderItem={({ item }) => (
+              <Image source={{ uri: item.url }} style={styles.galeriaImagen} />
+            )}
+          />
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
+
 
 // ---- Lógica de abierto/cerrado (equivalente a tu Calendar.getInstance() de Kotlin) ----
 function calcularEstado(horarios: Horario[]) {
@@ -284,4 +374,62 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   textoCard: { fontSize: 14, color: "#333", marginTop: 8 },
+
+  // 🔧 CAMBIO: estilos nuevos para el carrusel de imágenes principal
+  puntosContenedor: {
+    flexDirection: "row",
+    justifyContent: "center",
+    position: "absolute",
+    bottom: 12,
+    left: 0,
+    right: 0,
+  },
+  punto: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    marginHorizontal: 3,
+  },
+  puntoActivo: {
+    backgroundColor: "#fff",
+    width: 18,
+  },
+  botonGaleria: {
+    position: "absolute",
+    bottom: 16,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  textoBotonGaleria: { color: "#fff", fontWeight: "600" },
+
+  // 🔧 CAMBIO: estilos nuevos para el Modal de galería completa
+  galeriaContenedor: { flex: 1, backgroundColor: "#fff" },
+  galeriaEncabezado: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 55,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEE",
+  },
+  galeriaVolver: { fontSize: 15, color: "#5B8DB8", fontWeight: "600" },
+  galeriaTitulo: {
+    fontSize: 16,
+    fontWeight: "bold",
+    flex: 1,
+    textAlign: "center",
+  },
+  galeriaGrid: { padding: 8 },
+  galeriaImagen: {
+    width: "48%",
+    aspectRatio: 1,
+    margin: "1%",
+    borderRadius: 8,
+  },
 });

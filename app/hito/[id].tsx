@@ -1,3 +1,4 @@
+import InfoModal from "@/components/InfoModal";
 import { supabase } from "@/lib/supabase";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -54,6 +55,10 @@ export default function DetalleHitoScreen() {
 
   const [indiceActual, setIndiceActual] = useState(0);
   const [galeriaAbierta, setGaleriaAbierta] = useState(false);
+
+const [modalVisible, setModalVisible] = useState(false);
+const [tituloModal, setTituloModal] = useState("");
+const [textoModal, setTextoModal] = useState("");
 
   useEffect(() => {
     async function cargarDatos() {
@@ -198,7 +203,7 @@ export default function DetalleHitoScreen() {
         {/* Tarjeta de HORARIOS */}
         {horarios.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitulo}>🕘 Horarios de atención</Text>
+            <Text style={styles.cardTitulo}>Horarios de atención</Text>
             {horarios
               .sort((a, b) => a.dia_semana - b.dia_semana)
               .map((h, i) => (
@@ -213,49 +218,171 @@ export default function DetalleHitoScreen() {
           </View>
         )}
 
-        {/* Tarjeta de PRECIOS DE ENTRADA */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitulo}>💵 Precios de entrada</Text>
-          <Text style={styles.textoPrecio}>
-            {hito.precio_texto
-              ? hito.precio_texto
-              : hito.precio && hito.precio > 0
-                ? `Entrada general: $${hito.precio.toFixed(2)} por persona`
-                : "Acceso gratuito"}
-          </Text>
-        </View>
+       {/* PRECIOS */}
 
-        {/* Carrusel horizontal: Datos curiosos / Historia o Leyenda / Eventos */}
-        <ScrollView
-          horizontal
-          style={styles.carrusel}
-          showsHorizontalScrollIndicator={false}
-        >
-          {hito.dato_curioso && (
-            <View style={styles.cardCarrusel}>
-              <Text style={styles.cardTitulo}>Datos curiosos</Text>
-              <Text style={styles.textoCard}>{hito.dato_curioso}</Text>
-            </View>
-          )}
+<TouchableOpacity
+    style={styles.card}
+    onPress={()=>{
+        setTituloModal("Precios");
 
-          {(hito.historia || hito.leyenda) && (
-            <View style={styles.cardCarrusel}>
-              <Text style={styles.cardTitulo}>
-                {hito.historia ? "Historia" : "Leyenda"}
-              </Text>
-              <Text style={styles.textoCard}>
-                {hito.historia ?? hito.leyenda}
-              </Text>
-            </View>
-          )}
+        setTextoModal(
+            hito.precio_texto
+            ? hito.precio_texto
+            : hito.precio && hito.precio>0
+            ? `Entrada general: $${hito.precio.toFixed(2)} por persona`
+            : "Acceso gratuito."
+        );
 
-          {hito.eventos_info && (
-            <View style={styles.cardCarrusel}>
-              <Text style={styles.cardTitulo}>Eventos</Text>
-              <Text style={styles.textoCard}>{hito.eventos_info}</Text>
-            </View>
-          )}
-        </ScrollView>
+        setModalVisible(true);
+    }}
+>
+
+<View style={styles.opcion}>
+
+<Text style={styles.opcionTitulo}>
+Precios de entrada
+</Text>
+
+<Text style={styles.flecha}>›</Text>
+
+</View>
+
+</TouchableOpacity>
+
+
+
+<Text
+style={styles.subtitulo}
+>
+
+Información
+
+</Text>
+
+
+
+<ScrollView
+horizontal
+showsHorizontalScrollIndicator={false}
+contentContainerStyle={styles.carruselInfo}
+>
+
+{/* LEYENDA */}
+
+<TouchableOpacity
+
+style={styles.cardInfo}
+
+onPress={()=>{
+
+setTituloModal("Leyenda");
+
+setTextoModal(hito.historia || hito.leyenda || "No disponible.");
+
+setModalVisible(true);
+
+}}
+
+>
+
+<Text style={styles.tituloCard}>
+Leyenda
+</Text>
+
+<Text
+numberOfLines={2}
+style={styles.descripcionCard}
+>
+
+Descubre la historia de este lugar.
+
+</Text>
+
+<Text style={styles.flechaCard}>
+›
+</Text>
+
+</TouchableOpacity>
+
+
+
+{/* DATO CURIOSO */}
+
+<TouchableOpacity
+
+style={styles.cardInfo}
+
+onPress={()=>{
+
+setTituloModal("Dato curioso");
+
+setTextoModal(hito.dato_curioso || "No disponible.");
+
+setModalVisible(true);
+
+}}
+
+>
+
+<Text style={styles.tituloCard}>
+Dato curioso
+</Text>
+
+<Text
+numberOfLines={2}
+style={styles.descripcionCard}
+>
+
+Conoce algo interesante.
+
+</Text>
+
+<Text style={styles.flechaCard}>
+›
+</Text>
+
+</TouchableOpacity>
+
+
+
+{/* EVENTOS */}
+
+<TouchableOpacity
+
+style={styles.cardInfo}
+
+onPress={()=>{
+
+setTituloModal("Eventos");
+
+setTextoModal(hito.eventos_info || "No disponible.");
+
+setModalVisible(true);
+
+}}
+
+>
+
+<Text style={styles.tituloCard}>
+Eventos
+</Text>
+
+<Text
+numberOfLines={2}
+style={styles.descripcionCard}
+>
+
+Actividades del lugar.
+
+</Text>
+
+<Text style={styles.flechaCard}>
+›
+</Text>
+
+</TouchableOpacity>
+
+</ScrollView>
       </View>
 
        <Modal
@@ -285,6 +412,14 @@ export default function DetalleHitoScreen() {
           />
         </View>
       </Modal>
+
+            <InfoModal
+        visible={modalVisible}
+        titulo={tituloModal}
+        texto={textoModal}
+        onClose={() => setModalVisible(false)}
+      />
+
     </ScrollView>
   );
 }
@@ -432,4 +567,58 @@ const styles = StyleSheet.create({
     margin: "1%",
     borderRadius: 8,
   },
+  subtitulo:{
+    fontSize:20,
+    fontWeight:"bold",
+    marginTop:20,
+    marginBottom:10
+},
+
+opcion:{
+    flexDirection:"row",
+    justifyContent:"space-between",
+    alignItems:"center"
+},
+
+opcionTitulo:{
+    fontSize:17,
+    fontWeight:"600"
+},
+
+flecha:{
+    fontSize:30,
+    color:"#999"
+},
+
+carruselInfo:{
+    paddingBottom:10
+},
+
+cardInfo:{
+    width:230,
+    height:120,
+    backgroundColor:"#fff",
+    borderRadius:18,
+    padding:18,
+    marginRight:15,
+    elevation:4,
+    justifyContent:"space-between"
+},
+
+tituloCard:{
+    fontSize:18,
+    fontWeight:"bold"
+},
+
+descripcionCard:{
+    color:"#666",
+    fontSize:14,
+    marginTop:8
+},
+
+flechaCard:{
+    alignSelf:"flex-end",
+    fontSize:28,
+    color:"#888"
+},
 });

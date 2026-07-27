@@ -38,9 +38,11 @@ type Horario = {
 type ImagenHito = {
   url: string;
   orden: number;
+  anio: number | null;
+  descripcion: string | null;
 };
 
-const { width: ANCHO_PANTALLA } = Dimensions.get("window");
+const { width: ANCHO_PANTALLA, height: ALTO_PANTALLA } = Dimensions.get("window");
 const ALTURA_CARRUSEL = 260;
 const MAX_IMAGENES_CARRUSEL = 5;
 
@@ -55,10 +57,12 @@ export default function DetalleHitoScreen() {
 
   const [indiceActual, setIndiceActual] = useState(0);
   const [galeriaAbierta, setGaleriaAbierta] = useState(false);
+  const [indiceFullscreen, setIndiceFullscreen] = useState<number | null>(null);
 
 const [modalVisible, setModalVisible] = useState(false);
 const [tituloModal, setTituloModal] = useState("");
 const [textoModal, setTextoModal] = useState("");
+const [descripcionExpandida, setDescripcionExpandida] = useState(false);
 
   useEffect(() => {
     async function cargarDatos() {
@@ -80,7 +84,7 @@ const [textoModal, setTextoModal] = useState("");
       // 3. Imágenes de ese hito (carrusel)
       const { data: imagenesData } = await supabase
         .from("hito_imagenes")
-        .select("url, orden")
+        .select("url, orden, anio, descripcion")
         .eq("hito_id", id)
         .order("orden", { ascending: true });
 
@@ -184,8 +188,27 @@ const [textoModal, setTextoModal] = useState("");
 
         {/* Descripción */}
         {hito.descripcion && (
-          <Text style={styles.descripcion}>{hito.descripcion}</Text>
-        )}
+  <>
+    <Text
+      style={styles.descripcion}
+      numberOfLines={descripcionExpandida ? undefined : 4}
+    >
+      {hito.descripcion}
+    </Text>
+
+    {hito.descripcion.length > 180 && (
+      <TouchableOpacity
+        onPress={() =>
+          setDescripcionExpandida(!descripcionExpandida)
+        }
+      >
+        <Text style={styles.leerMas}>
+          {descripcionExpandida ? "Leer menos" : "Leer más"}
+        </Text>
+      </TouchableOpacity>
+    )}
+  </>
+)}
 
         {/* Tarjeta de ESTADO (abierto/cerrado, calculado en tiempo real) */}
         <View style={[styles.card, styles.cardEstado]}>
@@ -406,10 +429,82 @@ Actividades del lugar.
             keyExtractor={(item, i) => `${item.url}-${i}`}
             numColumns={2}
             contentContainerStyle={styles.galeriaGrid}
-            renderItem={({ item }) => (
-              <Image source={{ uri: item.url }} style={styles.galeriaImagen} />
+            renderItem={({ item, index }) => (
+              <TouchableOpacity
+                style={styles.galeriaCelda}
+                onPress={() => setIndiceFullscreen(index)}
+                activeOpacity={0.85}
+              >
+                <Image source={{ uri: item.url }} style={styles.galeriaImagen} />
+                {/* 🔧 CAMBIO: overlay con año y descripción */}
+                {(item.anio || item.descripcion) && (
+                  <View style={styles.galeriaOverlay}>
+                    {item.anio && (
+                      <Text style={styles.galeriaAnio}>{item.anio}</Text>
+                    )}
+                    {item.descripcion && (
+                      <Text style={styles.galeriaDescripcion} numberOfLines={1}>
+                        {item.descripcion}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </TouchableOpacity>
             )}
           />
+        </View>
+      </Modal>
+
+      <Modal
+        visible={indiceFullscreen !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setIndiceFullscreen(null)}
+      >
+        <View style={styles.fullscreenFondo}>
+          <TouchableOpacity
+            style={styles.fullscreenCerrar}
+            onPress={() => setIndiceFullscreen(null)}
+          >
+            <Text style={styles.fullscreenCerrarTexto}>✕</Text>
+          </TouchableOpacity>
+
+          {indiceFullscreen !== null && (
+            <FlatList
+              data={imagenes}
+              keyExtractor={(item, i) => `${item.url}-fs-${i}`}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={indiceFullscreen}
+              getItemLayout={(_, i) => ({
+                length: ANCHO_PANTALLA,
+                offset: ANCHO_PANTALLA * i,
+                index: i,
+              })}
+              renderItem={({ item }) => (
+                <View style={styles.fullscreenSlide}>
+                  <Image
+                    source={{ uri: item.url }}
+                    style={styles.fullscreenImagen}
+                    resizeMode="contain"
+                  />
+                  {(item.anio || item.descripcion) && (
+                    <View style={styles.fullscreenInfo}>
+                      {item.anio && (
+                        <Text style={styles.fullscreenAnio}>{item.anio}</Text>
+                      )}
+                      {item.descripcion && (
+                        <Text style={styles.fullscreenDescripcion}>
+                          {item.descripcion}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
+            />
+          )}
         </View>
       </Modal>
 
@@ -480,6 +575,12 @@ const styles = StyleSheet.create({
   titulo: { fontSize: 26, fontWeight: "bold", color: "#000" },
   ubicacion: { fontSize: 14, color: "#444", marginTop: 8 },
   descripcion: { fontSize: 15, color: "#333", marginTop: 12, lineHeight: 22 },
+  leerMas: {
+    color: "#2E7D32",
+    fontWeight: "bold",
+    marginTop: 6,
+    fontSize: 15,
+},
   card: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -561,12 +662,62 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   galeriaGrid: { padding: 8 },
-  galeriaImagen: {
+  galeriaCelda: {
     width: "48%",
     aspectRatio: 1,
     margin: "1%",
     borderRadius: 8,
+    overflow: "hidden",
+    position: "relative",
   },
+  galeriaImagen: {
+    width: "100%",
+    height: "100%",
+  },
+  // 🔧 CAMBIO: nuevos estilos — overlay de año/descripción sobre cada miniatura
+  galeriaOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  galeriaAnio: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  galeriaDescripcion: { color: "#fff", fontSize: 11, marginTop: 1 },
+
+  // 🔧 CAMBIO: nuevos estilos — visor de pantalla completa
+  fullscreenFondo: { flex: 1, backgroundColor: "#000" },
+  fullscreenCerrar: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullscreenCerrarTexto: { color: "#fff", fontSize: 18, fontWeight: "bold" },
+  fullscreenSlide: {
+    width: ANCHO_PANTALLA,
+    height: ALTO_PANTALLA,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullscreenImagen: { width: "100%", height: "80%" },
+  fullscreenInfo: {
+    position: "absolute",
+    bottom: 60,
+    left: 20,
+    right: 20,
+  },
+  fullscreenAnio: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  fullscreenDescripcion: { color: "#eee", fontSize: 14, marginTop: 2 },
+  
   subtitulo:{
     fontSize:20,
     fontWeight:"bold",
@@ -574,7 +725,7 @@ const styles = StyleSheet.create({
     marginBottom:10
 },
 
-opcion:{
+  opcion:{
     flexDirection:"row",
     justifyContent:"space-between",
     alignItems:"center"

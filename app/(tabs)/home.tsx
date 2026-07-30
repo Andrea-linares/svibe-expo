@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -45,6 +45,9 @@ const RANGOS_PRECIO = [
   { etiqueta: "Más de $6", min: 6.01, max: 999 },
 ];
 
+// Ancho de cada tarjeta del carrusel (160 de la tarjeta + 12 del margen)
+const ANCHO_TARJETA_CARRUSEL = 172;
+
 export default function HomeScreen() {
   const [carrusel, setCarrusel] = useState<Hito[]>([]);
   const [imprescindibles, setImprescindibles] = useState<Hito[]>([]);
@@ -61,6 +64,11 @@ export default function HomeScreen() {
   const [rangoFiltro, setRangoFiltro] = useState<
     (typeof RANGOS_PRECIO)[0] | null
   >(null);
+
+  // ---- Referencias para el auto-scroll del carrusel ----
+  const scrollCarruselRef = useRef<ScrollView>(null);
+  const indiceCarruselRef = useRef(0);
+  const pausadoRef = useRef(false);
 
   // Carga inicial: categorías + tarjetas del home
   useEffect(() => {
@@ -87,6 +95,35 @@ export default function HomeScreen() {
     cargarInicial();
   }, []);
 
+  // ---- Auto-scroll del carrusel: avanza sola cada 3 segundos ----
+  useEffect(() => {
+    if (carrusel.length === 0) return;
+
+    const intervalo = setInterval(() => {
+      if (pausadoRef.current) return; // si el usuario lo está tocando, no la muevas
+
+      indiceCarruselRef.current =
+        (indiceCarruselRef.current + 1) % carrusel.length;
+      scrollCarruselRef.current?.scrollTo({
+        x: indiceCarruselRef.current * ANCHO_TARJETA_CARRUSEL,
+        animated: true,
+      });
+    }, 3000);
+
+    return () => clearInterval(intervalo);
+  }, [carrusel]);
+
+  function pausarCarrusel() {
+    pausadoRef.current = true;
+  }
+
+  function reanudarCarruselConRetraso() {
+    // Espera unos segundos después de soltar antes de retomar el auto-scroll
+    setTimeout(() => {
+      pausadoRef.current = false;
+    }, 4000);
+  }
+
   // Búsqueda + filtros: se dispara cada vez que cambia el texto o los filtros
   const hayFiltrosActivos =
     busqueda.trim().length > 0 ||
@@ -105,7 +142,9 @@ export default function HomeScreen() {
 
       let query = supabase
         .from("hitos")
-        .select("id, nombre, direccion_referencia, precio, categoria_id, hito_imagenes(url, orden)");
+        .select(
+          "id, nombre, direccion_referencia, precio, categoria_id, hito_imagenes(url, orden)",
+        );
 
       const texto = busqueda.trim();
       if (texto.length > 0) {
@@ -208,9 +247,18 @@ export default function HomeScreen() {
         <ScrollView style={styles.scroll}>
           <Text style={styles.tituloSeccion}>Descubre El Salvador</Text>
           <ScrollView
+            ref={scrollCarruselRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.carrusel}
+            onTouchStart={pausarCarrusel}
+            onScrollEndDrag={reanudarCarruselConRetraso}
+            onMomentumScrollEnd={(evento) => {
+              // Sincroniza el índice si el usuario deslizó manualmente
+              indiceCarruselRef.current = Math.round(
+                evento.nativeEvent.contentOffset.x / ANCHO_TARJETA_CARRUSEL,
+              );
+            }}
           >
             {carrusel.map((hito) => (
               <TarjetaCarrusel key={hito.id} hito={hito} />
@@ -336,9 +384,7 @@ export default function HomeScreen() {
 
 function obtenerImagenPrincipal(hito: Hito) {
   if (hito.hito_imagenes && hito.hito_imagenes.length > 0) {
-    const ordenadas = [...hito.hito_imagenes].sort(
-      (a, b) => a.orden - b.orden,
-    );
+    const ordenadas = [...hito.hito_imagenes].sort((a, b) => a.orden - b.orden);
     return { uri: ordenadas[0].url };
   }
   return require("@/assets/images/partial-react-logo.png");
@@ -367,10 +413,7 @@ function TarjetaGrid({ hito }: { hito: Hito }) {
       style={styles.cardGrid}
       onPress={() => router.push(`/hito/${hito.id}`)}
     >
-      <Image
-        source={obtenerImagenPrincipal(hito)}
-        style={styles.imagenGrid}
-      />
+      <Image source={obtenerImagenPrincipal(hito)} style={styles.imagenGrid} />
       <Text style={styles.nombreGrid} numberOfLines={2}>
         {hito.nombre}
       </Text>

@@ -225,21 +225,16 @@ const [descripcionExpandida, setDescripcionExpandida] = useState(false);
 
         {/* Tarjeta de HORARIOS */}
         {horarios.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitulo}>Horarios de atención</Text>
-            {horarios
-              .sort((a, b) => a.dia_semana - b.dia_semana)
-              .map((h, i) => (
-                <View key={i} style={styles.filaHorario}>
-                  <Text>{nombreDia(h.dia_semana)}</Text>
-                  <Text style={{ fontWeight: "bold" }}>
-                    {formatearHora(h.hora_apertura)} -{" "}
-                    {formatearHora(h.hora_cierre)}
-                  </Text>
-                </View>
-              ))}
-          </View>
-        )}
+        <View style={styles.card}>
+          <Text style={styles.cardTitulo}>Horarios de atención</Text>
+          {formatearHorarios(horarios).map((item, index) => (
+        <View key={index} style={styles.filaHorario}>
+          <Text style={styles.horarioDia}>{item.rango}</Text>
+          <Text style={styles.horarioHora}>{item.horario}</Text>
+      </View>
+    ))}
+  </View>
+  )}
 
        {/* PRECIOS */}
 
@@ -567,6 +562,69 @@ function formatearHora(hora: string) {
   return `${hora12}:${m.toString().padStart(2, "0")} ${periodo}`;
 }
 
+// ===== FUNCIÓN NUEVA PARA AGRUPAR HORARIOS =====
+function formatearHorarios(horarios: Horario[]) {
+  if (!horarios || horarios.length === 0) {
+    return [{ rango: "Horario no disponible", horario: "" }];
+  }
+
+  // Verificar si es 24/7
+  const es24Horas = horarios.every(h => 
+    h.hora_apertura === "00:00:00" && h.hora_cierre === "23:59:00"
+  );
+
+  if (es24Horas) {
+    return [{ rango: "Todos los días", horario: "24 horas" }];
+  }
+
+  // Agrupar por horario
+  const grupos = new Map<string, number[]>();
+  
+  horarios.forEach(h => {
+    const clave = `${h.hora_apertura}-${h.hora_cierre}`;
+    if (!grupos.has(clave)) {
+      grupos.set(clave, []);
+    }
+    grupos.get(clave)!.push(h.dia_semana);
+  });
+
+  const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const resultado: { rango: string; horario: string }[] = [];
+
+  grupos.forEach((dias, clave) => {
+    const [horaApertura, horaCierre] = clave.split("-");
+    const diasOrdenados = dias.sort((a, b) => a - b);
+    
+    // Encontrar rangos consecutivos
+    const rangos: number[][] = [];
+    let inicio = 0;
+    for (let i = 0; i < diasOrdenados.length; i++) {
+      if (i === diasOrdenados.length - 1 || diasOrdenados[i + 1] !== diasOrdenados[i] + 1) {
+        rangos.push(diasOrdenados.slice(inicio, i + 1));
+        inicio = i + 1;
+      }
+    }
+    
+    rangos.forEach(rango => {
+      let rangoTexto = rango.length === 1 
+        ? DIAS[rango[0]]
+        : `${DIAS[rango[0]]} - ${DIAS[rango[rango.length - 1]]}`;
+      
+      // Si cubre todos los días (0-6)
+      if (rango[0] === 0 && rango[rango.length - 1] === 6 && rango.length === 7) {
+        rangoTexto = "Todos los días";
+      }
+      
+      resultado.push({
+        rango: rangoTexto,
+        horario: `${formatearHora(horaApertura)} - ${formatearHora(horaCierre)}`
+      });
+    });
+  });
+
+  return resultado;
+}
+
 const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: "#F3F3F3" },
   centrado: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -771,5 +829,16 @@ flechaCard:{
     alignSelf:"flex-end",
     fontSize:28,
     color:"#888"
+},
+
+horarioDia: {
+  fontSize: 14,
+  color: "#333",
+  flex: 1, // Esto hace que el día ocupe espacio y el horario vaya a la derecha
+},
+horarioHora: {
+  fontSize: 14,
+  fontWeight: "bold",
+  color: "#333",
 },
 });

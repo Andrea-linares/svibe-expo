@@ -3,14 +3,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ImageBackground,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ImageBackground,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function RegistroScreen() {
@@ -60,20 +60,12 @@ export default function RegistroScreen() {
       return;
     }
 
-    // Creamos su fila en "perfiles" con el nombre que puso
-    if (data.user) {
-      await supabase.from("perfiles").insert({
-        id: data.user.id,
-        nombre: nombre.trim(),
-      });
-    }
-
     setCargando(false);
 
     // Lo mandamos a la pantalla de verificación con el correo como parámetro
     router.push({
       pathname: "/verificar-codigo",
-      params: { correo: correo.trim() },
+      params: { correo: correo.trim(), nombre: nombre.trim() },
     });
   }
 

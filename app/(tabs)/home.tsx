@@ -35,6 +35,7 @@ const OPCIONES_MENU = [
   "Sugerencias",
   "Reportar un problema",
   "Foro",
+  "Mis preferencias",
 ];
 
 // Rangos de precio para el filtro
@@ -65,35 +66,114 @@ export default function HomeScreen() {
     (typeof RANGOS_PRECIO)[0] | null
   >(null);
 
+  //preferencias
+  const [categoriasPreferidas, setCategoriasPreferidas] = useState<number[]>([]);
+  const [usuarioAutenticado, setUsuarioAutenticado] = useState(false);
+  const [verificandoPreferencias, setVerificandoPreferencias] = useState(true);
+
   // ---- Referencias para el auto-scroll del carrusel ----
   const scrollCarruselRef = useRef<ScrollView>(null);
   const indiceCarruselRef = useRef(0);
   const pausadoRef = useRef(false);
 
-  // Carga inicial: categorías + tarjetas del home
+  async function cargarPreferencias() {
+    try {
+      const { data: sesion } = await supabase.auth.getUser();
+
+      if (sesion?.user) {
+        setUsuarioAutenticado(true);
+
+        const { data } = await supabase
+          .from("usuario_categorias")
+          .select("categoria_id")
+          .eq("usuario_id", sesion.user.id);
+
+        const ids = (data ?? []).map((p) => p.categoria_id);
+        setCategoriasPreferidas(ids); // 🔴 INICIO CAMBIO: Se agregó esta línea para actualizar el estado si hay IDs
+
+        console.log("📌 Preferencias del usuario:", ids);
+
+        if (ids.length === 0) {
+          console.log("⚠️ Usuario sin preferencias, mostrando todos los lugares");
+          setCategoriasPreferidas([]);
+          setUsuarioAutenticado(true);
+        }
+      } else {
+        setUsuarioAutenticado(false);
+        setCategoriasPreferidas([]);
+        console.log("👤 Usuario invitado, mostrando todos los lugares");
+      }
+    } catch (error) {
+      console.error("❌ Error cargando preferencias:", error);
+      setUsuarioAutenticado(false);
+      setCategoriasPreferidas([]);
+    } finally {
+      setVerificandoPreferencias(false);
+    }
+  }
+
+  // 🔴 INICIO CAMBIO: Se eliminó la lógica de los hitos de aquí y se cambió la dependencia a []
+  // Carga inicial SOLO de categorías y preferencias (se ejecuta una sola vez)
   useEffect(() => {
     async function cargarInicial() {
-      const { data: cats } = await supabase
-        .from("categorias")
-        .select("id, nombre");
-      setCategorias(cats ?? []);
+      try {
+        // 1. Cargar categorías
+        const { data: cats } = await supabase
+          .from("categorias")
+          .select("id, nombre");
+        setCategorias(cats ?? []);
 
-      const { data } = await supabase
-        .from("hitos")
-        .select(
-          "id, nombre, direccion_referencia, precio, categoria_id, creado_en, hito_imagenes(url, orden)",
-        )
-        .eq("es_lugar_oculto", false)
-        .order("creado_en", { ascending: true });
+        // 2. Cargar preferencias del usuario
+        await cargarPreferencias();
 
-      if (data) {
-        setImprescindibles(data.slice(0, 10));
-        setCarrusel(data.slice(10, 14));
+      } catch (error) {
+        console.log(" Error en cargarInicial:", error);
       }
-      setCargando(false);
     }
     cargarInicial();
-  }, []);
+  }, []); 
+  // 🔴 FIN CAMBIO
+
+  // 🔴 INICIO CAMBIO: Nuevo useEffect separado para cargar los hitos cuando cambian las preferencias
+  // Este se ejecuta cuando el usuario termina de cargar, o cuando cambia su sesión/preferencias
+  useEffect(() => {
+    async function cargarHitos() {
+      if (verificandoPreferencias) return; // Espera a que termine de cargar preferencias
+
+      try {
+        // 3. Construir consulta de hitos
+        let query = supabase
+          .from("hitos")
+          .select(
+            "id, nombre, direccion_referencia, precio, categoria_id, creado_en, hito_imagenes(url, orden)",
+          )
+          .eq("es_lugar_oculto", false);
+
+        // Filtrar SOLO si tiene preferencias
+        if (usuarioAutenticado && categoriasPreferidas.length > 0) {
+          query = query.in("categoria_id", categoriasPreferidas);
+          console.log("🔍 Filtrando por categorías:", categoriasPreferidas);
+        } else {
+          console.log("🔍 Mostrando todos los lugares (invitado o sin filtro)");
+        }
+
+        const { data } = await query.order("creado_en", { ascending: true });
+
+        if (data) {
+          setImprescindibles(data.slice(0, 10));
+          setCarrusel(data.slice(10, 14));
+        }
+
+      } catch (error) {
+        console.log(" Error en cargarHitos:", error);
+      } finally {
+        // Asegurar que cargando siempre se ponga en false
+        setCargando(false);
+      }
+    }
+    cargarHitos();
+  }, [usuarioAutenticado, categoriasPreferidas, verificandoPreferencias]); 
+  // 🔴 FIN CAMBIO
 
   // ---- Auto-scroll del carrusel: avanza sola cada 3 segundos ----
   useEffect(() => {
@@ -289,7 +369,16 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={opcion}
                 style={styles.itemMenu}
-                onPress={() => setMenuAbierto(false)}
+                onPress={() => {
+                  setMenuAbierto(false);
+                  // 🆕 NUEVO: Manejar "Mis preferencias"
+                  if (opcion === "Mis preferencias") {
+                    router.push("/preferencias");
+                  } else {
+                    // ... resto de opciones (por ahora solo cierra el menú)
+                    console.log(`📌 Opción seleccionada: ${opcion}`);
+                  }
+                }}
               >
                 <Text style={styles.textoItemMenu}>{opcion}</Text>
               </TouchableOpacity>

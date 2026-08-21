@@ -92,6 +92,15 @@ const [descripcionExpandida, setDescripcionExpandida] = useState(false);
       setHorarios(horariosData ?? []);
       setImagenes(imagenesData ?? []);
       setCargando(false);
+      
+      const { data: sesion } = await supabase.auth.getUser();
+      if (sesion?.user && hitoData) {
+        supabase.from("interacciones_usuario").insert({
+          usuario_id: sesion.user.id,
+          hito_id: id,
+          tipo_interaccion: "visita",
+        });
+      }
     }
 
     cargarDatos();

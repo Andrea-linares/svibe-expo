@@ -12,7 +12,7 @@ import {
 } from "react-native";
 
 export default function VerificarCodigoScreen() {
-  const { correo } = useLocalSearchParams<{ correo: string }>();
+  const { correo, nombre } = useLocalSearchParams<{ correo: string; nombre: string; }>();
   const [codigo, setCodigo] = useState("");
   const [cargando, setCargando] = useState(false);
 
@@ -27,7 +27,7 @@ export default function VerificarCodigoScreen() {
 
     setCargando(true);
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: correo,
       token: codigo.trim(),
       type: "signup",
@@ -43,8 +43,41 @@ export default function VerificarCodigoScreen() {
       return;
     }
 
+     if (data.user) {
+      try {
+        // Verificar si el perfil ya existe
+        const { data: perfilExistente } = await supabase
+          .from("perfiles")
+          .select("id")
+          .eq("id", data.user.id)
+          .single();
+
+        // Si no existe, crearlo
+        if (!perfilExistente) {
+          const { error: perfilError } = await supabase.from("perfiles").insert({
+            id: data.user.id,
+            nombre: nombre?.trim() || "Usuario",
+          });
+
+          if (perfilError) {
+            console.log(" Error creando perfil:", perfilError);
+            // No mostramos alerta al usuario para no interrumpir el flujo
+          } else {
+            console.log(" Perfil creado correctamente");
+          }
+        } else {
+          console.log(" Perfil ya existe");
+        }
+      } catch (error) {
+        console.log(" Error verificando perfil:", error);
+        // Continuamos con el flujo
+      }
+    }
+
+    setCargando(false);
+
     // Verificado correctamente -> lo mandamos al inicio
-    router.replace("/(tabs)/home");
+    router.replace("/preferencias");
   }
 
   async function reenviarCodigo() {

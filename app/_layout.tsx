@@ -1,3 +1,4 @@
+import { TemaProvider } from "@/contexts/ThemeContext";
 import {
   DarkTheme,
   DefaultTheme,
@@ -17,23 +18,25 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="registro" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="verificar-codigo"
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="hito/[id]" options={{ title: "" }} />
-        <Stack.Screen
-          name="modal"
-          options={{ presentation: "modal", title: "Modal" }}
-        />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <TemaProvider>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="registro" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="verificar-codigo"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="hito/[id]" options={{ title: "" }} />
+          <Stack.Screen
+            name="modal"
+            options={{ presentation: "modal", title: "Modal" }}
+          />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </TemaProvider>
   );
 }

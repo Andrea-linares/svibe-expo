@@ -1,3 +1,5 @@
+import { BotonTema } from "@/components/BotonTema";
+import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -50,6 +52,7 @@ const RANGOS_PRECIO = [
 const ANCHO_TARJETA_CARRUSEL = 172;
 
 export default function HomeScreen() {
+  const { colores } = useTema();
   const [carrusel, setCarrusel] = useState<Hito[]>([]);
   const [imprescindibles, setImprescindibles] = useState<Hito[]>([]);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Hito[] | null>(
@@ -67,7 +70,9 @@ export default function HomeScreen() {
   >(null);
 
   //preferencias
-  const [categoriasPreferidas, setCategoriasPreferidas] = useState<number[]>([]);
+  const [categoriasPreferidas, setCategoriasPreferidas] = useState<number[]>(
+    [],
+  );
   const [usuarioAutenticado, setUsuarioAutenticado] = useState(false);
   const [verificandoPreferencias, setVerificandoPreferencias] = useState(true);
 
@@ -94,7 +99,9 @@ export default function HomeScreen() {
         console.log("📌 Preferencias del usuario:", ids);
 
         if (ids.length === 0) {
-          console.log("⚠️ Usuario sin preferencias, mostrando todos los lugares");
+          console.log(
+            "⚠️ Usuario sin preferencias, mostrando todos los lugares",
+          );
           setCategoriasPreferidas([]);
           setUsuarioAutenticado(true);
         }
@@ -125,13 +132,12 @@ export default function HomeScreen() {
 
         // 2. Cargar preferencias del usuario
         await cargarPreferencias();
-
       } catch (error) {
         console.log(" Error en cargarInicial:", error);
       }
     }
     cargarInicial();
-  }, []); 
+  }, []);
   // 🔴 FIN CAMBIO
 
   // 🔴 INICIO CAMBIO: Nuevo useEffect separado para cargar los hitos cuando cambian las preferencias
@@ -163,7 +169,6 @@ export default function HomeScreen() {
           setImprescindibles(data.slice(0, 10));
           setCarrusel(data.slice(10, 14));
         }
-
       } catch (error) {
         console.log(" Error en cargarHitos:", error);
       } finally {
@@ -172,7 +177,7 @@ export default function HomeScreen() {
       }
     }
     cargarHitos();
-  }, [usuarioAutenticado, categoriasPreferidas, verificandoPreferencias]); 
+  }, [usuarioAutenticado, categoriasPreferidas, verificandoPreferencias]);
   // 🔴 FIN CAMBIO
 
   // ---- Auto-scroll del carrusel: avanza sola cada 3 segundos ----
@@ -258,15 +263,19 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.contenedor}>
+    <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
       {/* Encabezado: hamburguesa + barra de búsqueda + botón de filtro */}
-      <View style={styles.encabezado}>
+      <View
+        style={[styles.encabezado, { backgroundColor: colores.encabezado }]}
+      >
         <TouchableOpacity
           onPress={() => setMenuAbierto(true)}
           style={styles.botonIcono}
         >
           <Text style={styles.icono}>☰</Text>
         </TouchableOpacity>
+
+        <BotonTema />
 
         <TextInput
           style={styles.inputBusqueda}
@@ -295,7 +304,7 @@ export default function HomeScreen() {
         // ---- MODO BÚSQUEDA/FILTRO ----
         <ScrollView style={styles.scroll}>
           <View style={styles.encabezadoResultados}>
-            <Text style={styles.tituloSeccion}>
+            <Text style={[styles.tituloSeccion, { color: colores.texto }]}>
               {buscando
                 ? "Buscando..."
                 : `${resultadosBusqueda?.length ?? 0} resultados`}
@@ -325,7 +334,9 @@ export default function HomeScreen() {
       ) : (
         // ---- MODO NORMAL (inicio) ----
         <ScrollView style={styles.scroll}>
-          <Text style={styles.tituloSeccion}>Descubre El Salvador</Text>
+          <Text style={[styles.tituloSeccion, { color: colores.texto }]}>
+            Descubre El Salvador
+          </Text>
           <ScrollView
             ref={scrollCarruselRef}
             horizontal
@@ -345,7 +356,9 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
 
-          <Text style={styles.tituloSeccion}>Lugares imprescindibles</Text>
+          <Text style={[styles.tituloSeccion, { color: colores.texto }]}>
+            Lugares imprescindibles
+          </Text>
           <View style={styles.grid}>
             {imprescindibles.map((hito) => (
               <TarjetaGrid key={hito.id} hito={hito} />
@@ -363,8 +376,12 @@ export default function HomeScreen() {
           activeOpacity={1}
           onPress={() => setMenuAbierto(false)}
         >
-          <View style={styles.panelMenu}>
-            <Text style={styles.tituloMenu}>Menú</Text>
+          <View
+            style={[styles.panelMenu, { backgroundColor: colores.tarjeta }]}
+          >
+            <Text style={[styles.tituloMenu, { color: colores.texto }]}>
+              Menú
+            </Text>
             {OPCIONES_MENU.map((opcion) => (
               <TouchableOpacity
                 key={opcion}
@@ -380,7 +397,9 @@ export default function HomeScreen() {
                   }
                 }}
               >
-                <Text style={styles.textoItemMenu}>{opcion}</Text>
+                <Text style={[styles.textoItemMenu, { color: colores.texto }]}>
+                  {opcion}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -390,8 +409,12 @@ export default function HomeScreen() {
       {/* Modal de FILTROS */}
       <Modal visible={filtrosAbiertos} animationType="slide" transparent>
         <View style={styles.fondoOscuroCentrado}>
-          <View style={styles.panelFiltros}>
-            <Text style={styles.tituloMenu}>Filtrar por</Text>
+          <View
+            style={[styles.panelFiltros, { backgroundColor: colores.tarjeta }]}
+          >
+            <Text style={[styles.tituloMenu, { color: colores.texto }]}>
+              Filtrar por
+            </Text>
 
             <Text style={styles.subtituloFiltro}>Precio</Text>
             <View style={styles.chips}>
@@ -480,16 +503,20 @@ function obtenerImagenPrincipal(hito: Hito) {
 }
 
 function TarjetaCarrusel({ hito }: { hito: Hito }) {
+  const { colores } = useTema();
   return (
     <TouchableOpacity
-      style={styles.cardCarrusel}
+      style={[styles.cardCarrusel, { backgroundColor: colores.tarjeta }]}
       onPress={() => router.push(`/hito/${hito.id}`)}
     >
       <Image
         source={obtenerImagenPrincipal(hito)}
         style={styles.imagenCarrusel}
       />
-      <Text style={styles.nombreCarrusel} numberOfLines={1}>
+      <Text
+        style={[styles.nombreCarrusel, { color: colores.texto }]}
+        numberOfLines={1}
+      >
         {hito.nombre}
       </Text>
     </TouchableOpacity>
@@ -497,13 +524,17 @@ function TarjetaCarrusel({ hito }: { hito: Hito }) {
 }
 
 function TarjetaGrid({ hito }: { hito: Hito }) {
+  const { colores } = useTema();
   return (
     <TouchableOpacity
-      style={styles.cardGrid}
+      style={[styles.cardGrid, { backgroundColor: colores.tarjeta }]}
       onPress={() => router.push(`/hito/${hito.id}`)}
     >
       <Image source={obtenerImagenPrincipal(hito)} style={styles.imagenGrid} />
-      <Text style={styles.nombreGrid} numberOfLines={2}>
+      <Text
+        style={[styles.nombreGrid, { color: colores.texto }]}
+        numberOfLines={2}
+      >
         {hito.nombre}
       </Text>
       {hito.direccion_referencia && (

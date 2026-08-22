@@ -29,6 +29,18 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="olvide-password"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="verificar-recuperacion"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="nueva-contrasena"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen name="hito/[id]" options={{ title: "" }} />
           <Stack.Screen
             name="modal"

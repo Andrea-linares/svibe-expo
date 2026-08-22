@@ -23,19 +23,22 @@ export default function LoginScreen() {
   const [contrasena, setContrasena] = useState("");
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
 
-   //  Configuración para Google OAuth
-  
+  //  Configuración para Google OAuth
+
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
-    iosClientId: "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
-    webClientId: "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
+    clientId:
+      "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
+    iosClientId:
+      "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
+    webClientId:
+      "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
   });
 
   //  Efecto para manejar la respuesta cuando el usuario vuelve de Google
   useEffect(() => {
     if (response?.type === "success") {
       const { authentication } = response;
-      
+
       if (!authentication) return;
 
       const accessToken = authentication.accessToken;
@@ -68,7 +71,6 @@ export default function LoginScreen() {
       Alert.alert("Error", "No se pudo abrir el navegador de Google.");
     }
   }
-
 
   async function iniciarSesion() {
     if (!correo.trim() || !contrasena) {
@@ -150,9 +152,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          onPress={() => Alert.alert("En desarrollo", "Próximamente.")}
-        >
+        <TouchableOpacity onPress={() => router.push("/olvide-password")}>
           <Text style={styles.olvidaste}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
 
@@ -171,7 +171,12 @@ export default function LoginScreen() {
           onPress={iniciarSesionGoogle}
           disabled={!request}
         >
-          <Ionicons name="logo-google" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Ionicons
+            name="logo-google"
+            size={20}
+            color="#fff"
+            style={{ marginRight: 8 }}
+          />
           <Text style={styles.textoBotonGoogle}>Continuar con Google</Text>
         </TouchableOpacity>
 
@@ -272,7 +277,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-   botonGoogle: {
+  botonGoogle: {
     flexDirection: "row",
     height: 52,
     borderRadius: 26,

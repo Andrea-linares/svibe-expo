@@ -1,8 +1,8 @@
 import { BotonTema } from "@/components/BotonTema";
 import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -55,6 +55,7 @@ export default function HomeScreen() {
   const { colores } = useTema();
   const [carrusel, setCarrusel] = useState<Hito[]>([]);
   const [imprescindibles, setImprescindibles] = useState<Hito[]>([]);
+  const [preferidos, setPreferidos] = useState<Hito[]>([]);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Hito[] | null>(
     null,
   );
@@ -76,6 +77,12 @@ export default function HomeScreen() {
   const [usuarioAutenticado, setUsuarioAutenticado] = useState(false);
   const [verificandoPreferencias, setVerificandoPreferencias] = useState(true);
 
+   const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
+  const [seleccionOnboarding, setSeleccionOnboarding] = useState<Set<number>>(
+    new Set(),
+  );
+  const [guardandoOnboarding, setGuardandoOnboarding] = useState(false);
+  
   // ---- Referencias para el auto-scroll del carrusel ----
   const scrollCarruselRef = useRef<ScrollView>(null);
   const indiceCarruselRef = useRef(0);
@@ -94,24 +101,30 @@ export default function HomeScreen() {
           .eq("usuario_id", sesion.user.id);
 
         const ids = (data ?? []).map((p) => p.categoria_id);
-        setCategoriasPreferidas(ids); // 🔴 INICIO CAMBIO: Se agregó esta línea para actualizar el estado si hay IDs
+        setCategoriasPreferidas(ids);
 
-        console.log("📌 Preferencias del usuario:", ids);
+        const { data: perfilData } = await supabase
+          .from("perfiles")
+          .select("onboarding_visto")
+          .eq("id", sesion.user.id)
+          .single();
+
+        const yaVioOnboarding = perfilData?.onboarding_visto ?? false;
 
         if (ids.length === 0) {
-          console.log(
-            "⚠️ Usuario sin preferencias, mostrando todos los lugares",
-          );
           setCategoriasPreferidas([]);
           setUsuarioAutenticado(true);
+
+          if (!yaVioOnboarding) {
+            setMostrarOnboarding(true);
+          }
         }
       } else {
         setUsuarioAutenticado(false);
         setCategoriasPreferidas([]);
-        console.log("👤 Usuario invitado, mostrando todos los lugares");
       }
     } catch (error) {
-      console.error("❌ Error cargando preferencias:", error);
+      console.error(" Error cargando preferencias:", error);
       setUsuarioAutenticado(false);
       setCategoriasPreferidas([]);
     } finally {
@@ -119,55 +132,104 @@ export default function HomeScreen() {
     }
   }
 
-  // 🔴 INICIO CAMBIO: Se eliminó la lógica de los hitos de aquí y se cambió la dependencia a []
-  // Carga inicial SOLO de categorías y preferencias (se ejecuta una sola vez)
-  useEffect(() => {
+  function toggleCategoriaOnboarding(id: number) {
+    setSeleccionOnboarding((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) {
+        nuevo.delete(id);
+      } else {
+        nuevo.add(id);
+      }
+      return nuevo;
+    });
+  }
+
+  async function guardarOnboardingPreferencias() {
+    const { data: sesion } = await supabase.auth.getUser();
+    if (!sesion?.user) return;
+
+    setGuardandoOnboarding(true);
+
+    if (seleccionOnboarding.size > 0) {
+      const filas = Array.from(seleccionOnboarding).map((categoria_id) => ({
+        usuario_id: sesion.user.id,
+        categoria_id,
+      }));
+      await supabase.from("usuario_categorias").insert(filas);
+      setCategoriasPreferidas(Array.from(seleccionOnboarding));
+    }
+
+    await supabase
+      .from("perfiles")
+      .update({ onboarding_visto: true })
+      .eq("id", sesion.user.id);
+
+    setGuardandoOnboarding(false);
+    setMostrarOnboarding(false);
+  }
+
+  async function omitirOnboarding() {
+    const { data: sesion } = await supabase.auth.getUser();
+    if (sesion?.user) {
+      await supabase
+        .from("perfiles")
+        .update({ onboarding_visto: true })
+        .eq("id", sesion.user.id);
+    }
+    setMostrarOnboarding(false);
+  }
+
+  useFocusEffect(
+  useCallback(() => {
     async function cargarInicial() {
       try {
-        // 1. Cargar categorías
         const { data: cats } = await supabase
           .from("categorias")
           .select("id, nombre");
         setCategorias(cats ?? []);
 
-        // 2. Cargar preferencias del usuario
         await cargarPreferencias();
       } catch (error) {
-        console.log(" Error en cargarInicial:", error);
+        
       }
     }
     cargarInicial();
-  }, []);
-  // 🔴 FIN CAMBIO
-
-  // 🔴 INICIO CAMBIO: Nuevo useEffect separado para cargar los hitos cuando cambian las preferencias
-  // Este se ejecuta cuando el usuario termina de cargar, o cuando cambia su sesión/preferencias
+  }, []),
+);
+  
   useEffect(() => {
     async function cargarHitos() {
-      if (verificandoPreferencias) return; // Espera a que termine de cargar preferencias
+      if (verificandoPreferencias) return;
 
       try {
-        // 3. Construir consulta de hitos
-        let query = supabase
+        const { data } = await supabase
           .from("hitos")
           .select(
             "id, nombre, direccion_referencia, precio, categoria_id, creado_en, hito_imagenes(url, orden)",
           )
-          .eq("es_lugar_oculto", false);
-
-        // Filtrar SOLO si tiene preferencias
-        if (usuarioAutenticado && categoriasPreferidas.length > 0) {
-          query = query.in("categoria_id", categoriasPreferidas);
-          console.log("🔍 Filtrando por categorías:", categoriasPreferidas);
-        } else {
-          console.log("🔍 Mostrando todos los lugares (invitado o sin filtro)");
-        }
-
-        const { data } = await query.order("creado_en", { ascending: true });
+          .eq("es_lugar_oculto", false)
+          .order("creado_en", { ascending: true });
 
         if (data) {
           setImprescindibles(data.slice(0, 10));
           setCarrusel(data.slice(10, 14));
+        }
+
+      
+        if (usuarioAutenticado && categoriasPreferidas.length > 0) {
+          const { data: dataPreferidos } = await supabase
+            .from("hitos")
+            .select(
+              "id, nombre, direccion_referencia, precio, categoria_id, creado_en, hito_imagenes(url, orden)",
+            )
+            .eq("es_lugar_oculto", false)
+            .in("categoria_id", categoriasPreferidas)
+            .order("creado_en", { ascending: true })
+            .limit(10);
+
+          setPreferidos(dataPreferidos ?? []);
+        } else {
+          setPreferidos([]);
         }
       } catch (error) {
         console.log(" Error en cargarHitos:", error);
@@ -178,14 +240,13 @@ export default function HomeScreen() {
     }
     cargarHitos();
   }, [usuarioAutenticado, categoriasPreferidas, verificandoPreferencias]);
-  // 🔴 FIN CAMBIO
 
   // ---- Auto-scroll del carrusel: avanza sola cada 3 segundos ----
   useEffect(() => {
     if (carrusel.length === 0) return;
 
     const intervalo = setInterval(() => {
-      if (pausadoRef.current) return; // si el usuario lo está tocando, no la muevas
+      if (pausadoRef.current) return; 
 
       indiceCarruselRef.current =
         (indiceCarruselRef.current + 1) % carrusel.length;
@@ -356,6 +417,36 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
 
+          {/* ==================== CAMBIO 4: INICIO — sección "Tus preferencias" ==================== */}
+          {preferidos.length > 0 && (
+            <>
+              <View style={styles.encabezadoPreferencias}>
+                <Text
+                  style={[
+                    styles.tituloSeccion,
+                    { color: colores.texto, marginTop: 0, marginBottom: 0 },
+                  ]}
+                >
+                  Tus preferencias
+                </Text>
+                <TouchableOpacity
+                >
+                  <Text style={styles.verTodas}>Ver todas</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.carrusel}
+              >
+                {preferidos.map((hito) => (
+                  <TarjetaCarrusel key={hito.id} hito={hito} />
+                ))}
+              </ScrollView>
+            </>
+          )}
+          {/* ==================== CAMBIO 4: FIN ==================== */}
+
           <Text style={[styles.tituloSeccion, { color: colores.texto }]}>
             Lugares imprescindibles
           </Text>
@@ -388,12 +479,10 @@ export default function HomeScreen() {
                 style={styles.itemMenu}
                 onPress={() => {
                   setMenuAbierto(false);
-                  // 🆕 NUEVO: Manejar "Mis preferencias"
                   if (opcion === "Mis preferencias") {
                     router.push("/preferencias");
                   } else {
-                    // ... resto de opciones (por ahora solo cierra el menú)
-                    console.log(`📌 Opción seleccionada: ${opcion}`);
+                    console.log(` Opción seleccionada: ${opcion}`);
                   }
                 }}
               >
@@ -487,6 +576,71 @@ export default function HomeScreen() {
                 <Text style={styles.textoBotonAplicar}>Aplicar</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* CAMBIO: Modal de onboarding ligero — aparece una sola vez */}
+      <Modal visible={mostrarOnboarding} animationType="fade" transparent>
+        <View style={styles.fondoOscuroCentrado}>
+          <View
+            style={[
+              styles.panelOnboarding,
+              { backgroundColor: colores.tarjeta },
+            ]}
+          >
+            <Text style={styles.iconoOnboarding}>🏛️</Text>
+            <Text style={[styles.tituloOnboarding, { color: colores.texto }]}>
+              Cuéntanos más de ti
+            </Text>
+            <Text style={styles.subtituloOnboarding}>
+              Elige los temas que más te interesan para mostrarte mejores
+              recomendaciones.
+            </Text>
+
+            <View style={styles.chipsOnboarding}>
+              {categorias.map((cat) => {
+                const activa = seleccionOnboarding.has(cat.id);
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.chipOnboarding,
+                      activa && styles.chipOnboardingActivo,
+                    ]}
+                    onPress={() => toggleCategoriaOnboarding(cat.id)}
+                  >
+                    <Text
+                      style={
+                        activa
+                          ? styles.chipOnboardingTextoActivo
+                          : styles.chipOnboardingTexto
+                      }
+                    >
+                      {cat.nombre}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              style={styles.botonGuardarOnboarding}
+              onPress={guardarOnboardingPreferencias}
+              disabled={guardandoOnboarding}
+            >
+              {guardandoOnboarding ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.textoBotonGuardarOnboarding}>
+                  Guardar preferencias
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={omitirOnboarding}>
+              <Text style={styles.textoOmitirOnboarding}>Ahora no</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -597,6 +751,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginHorizontal: 16,
   },
+
+  encabezadoPreferencias: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  verTodas: {
+    color: "#2196F3",
+    fontWeight: "600",
+    fontSize: 13,
+  },
   sinResultados: {
     textAlign: "center",
     color: "#888",
@@ -703,4 +871,56 @@ const styles = StyleSheet.create({
   },
   textoBotonLimpiar: { color: "#333", fontWeight: "600" },
   textoBotonAplicar: { color: "#fff", fontWeight: "600" },
+
+  panelOnboarding: {
+    width: "88%",
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+  },
+  iconoOnboarding: { fontSize: 40, marginBottom: 10 },
+  tituloOnboarding: {
+    fontSize: 20,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  subtituloOnboarding: {
+    fontSize: 13,
+    color: "#888",
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 18,
+    lineHeight: 18,
+  },
+  chipsOnboarding: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 20,
+  },
+  chipOnboarding: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: "#F0F0F0",
+  },
+  chipOnboardingActivo: { backgroundColor: "#3B6FA0" },
+  chipOnboardingTexto: { color: "#333", fontSize: 13 },
+  chipOnboardingTextoActivo: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  botonGuardarOnboarding: {
+    width: "100%",
+    height: 48,
+    backgroundColor: "#3B6FA0",
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  textoBotonGuardarOnboarding: { color: "#fff", fontWeight: "600" },
+  textoOmitirOnboarding: {
+    color: "#999",
+    fontSize: 13,
+    marginTop: 14,
+    textDecorationLine: "underline",
+  },
 });

@@ -64,6 +64,12 @@ const [tituloModal, setTituloModal] = useState("");
 const [textoModal, setTextoModal] = useState("");
 const [descripcionExpandida, setDescripcionExpandida] = useState(false);
 
+const [usuarioId, setUsuarioId] = useState<string | null>(null);
+const [mostrarFeedback, setMostrarFeedback] = useState(false);
+const [feedbackEnviado, setFeedbackEnviado] = useState<
+  "interesado" | "no_interesado" | null
+>(null);
+
   useEffect(() => {
     async function cargarDatos() {
       if (!id) return;
@@ -95,16 +101,47 @@ const [descripcionExpandida, setDescripcionExpandida] = useState(false);
       
       const { data: sesion } = await supabase.auth.getUser();
       if (sesion?.user && hitoData) {
+        setUsuarioId(sesion.user.id);
+
         supabase.from("interacciones_usuario").insert({
           usuario_id: sesion.user.id,
           hito_id: id,
           tipo_interaccion: "visita",
         });
+          const { data: feedbackPrevio } = await supabase
+          .from("interacciones_usuario")
+          .select("tipo_interaccion")
+          .eq("usuario_id", sesion.user.id)
+          .eq("hito_id", id)
+          .in("tipo_interaccion", ["interesado", "no_interesado"])
+          .order("creado_en", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (feedbackPrevio) {
+          setFeedbackEnviado(
+            feedbackPrevio.tipo_interaccion as "interesado" | "no_interesado",
+          );
+        } else {
+          setMostrarFeedback(true);
+        }
       }
     }
 
     cargarDatos();
   }, [id]);
+
+   async function enviarFeedback(tipo: "interesado" | "no_interesado") {
+    if (!usuarioId || !id) return;
+
+    setFeedbackEnviado(tipo);
+
+    await supabase.from("interacciones_usuario").insert({
+      usuario_id: usuarioId,
+      hito_id: id,
+      tipo_interaccion: tipo,
+    });
+  }
 
   if (cargando) {
     return (
@@ -128,7 +165,7 @@ const [descripcionExpandida, setDescripcionExpandida] = useState(false);
 
   return (
     <ScrollView style={styles.contenedor}>
-      {/* 🔧 CAMBIO: bloque completo de imagen principal reemplazado por carrusel + botón de galería */}
+      {/* bloque completo de imagen principal reemplazado por carrusel + botón de galería */}
       {imagenes.length > 0 ? (
         <View>
           <FlatList
@@ -218,6 +255,53 @@ const [descripcionExpandida, setDescripcionExpandida] = useState(false);
     )}
   </>
 )}
+
+{/* 🆕 CAMBIO: tarjeta de feedback contextual "¿Te interesó este hito?" */}
+        {mostrarFeedback && !feedbackEnviado && (
+          <View style={styles.cardFeedback}>
+            <View style={styles.filaFeedbackEncabezado}>
+              <Text style={styles.iconoFeedback}>🌱</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.tituloFeedback}>
+                  ¿Te interesó este hito?
+                </Text>
+                <Text style={styles.textoFeedback}>
+                  Tu opinión nos ayuda a mostrarte contenido que te guste más.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setMostrarFeedback(false)}>
+                <Text style={styles.cerrarFeedback}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.filaBotonesFeedback}>
+              <TouchableOpacity
+                style={styles.botonFeedbackSi}
+                onPress={() => enviarFeedback("interesado")}
+              >
+                <Text style={styles.textoBotonFeedbackSi}>
+                  👍 Sí, me interesó
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.botonFeedbackNo}
+                onPress={() => enviarFeedback("no_interesado")}
+              >
+                <Text style={styles.textoBotonFeedbackNo}>👎 No tanto</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {feedbackEnviado && (
+          <View style={styles.cardFeedbackEnviado}>
+            <Text style={styles.textoFeedbackEnviado}>
+              {feedbackEnviado === "interesado"
+                ? "✅ Gracias, tomamos nota de tu interés."
+                : "Gracias por tu opinión."}
+            </Text>
+          </View>
+        )}
 
         {/* Tarjeta de ESTADO (abierto/cerrado, calculado en tiempo real) */}
         <View style={[styles.card, styles.cardEstado]}>
@@ -850,4 +934,51 @@ horarioHora: {
   fontWeight: "bold",
   color: "#333",
 },
+
+// 🆕 CAMBIO: estilos nuevos para la tarjeta de feedback contextual
+cardFeedback: {
+  backgroundColor: "#F1F8F1",
+  borderRadius: 16,
+  padding: 16,
+  marginTop: 16,
+},
+filaFeedbackEncabezado: {
+  flexDirection: "row",
+  alignItems: "flex-start",
+},
+iconoFeedback: { fontSize: 22, marginRight: 10 },
+tituloFeedback: { fontSize: 15, fontWeight: "bold", color: "#1A2A3A" },
+textoFeedback: { fontSize: 12.5, color: "#666", marginTop: 3, lineHeight: 17 },
+cerrarFeedback: { fontSize: 16, color: "#999", paddingLeft: 8 },
+filaBotonesFeedback: {
+  flexDirection: "row",
+  gap: 10,
+  marginTop: 14,
+},
+botonFeedbackSi: {
+  flex: 1,
+  backgroundColor: "#2E7D32",
+  borderRadius: 20,
+  paddingVertical: 10,
+  alignItems: "center",
+},
+textoBotonFeedbackSi: { color: "#fff", fontWeight: "600", fontSize: 13 },
+botonFeedbackNo: {
+  flex: 1,
+  backgroundColor: "#fff",
+  borderWidth: 1,
+  borderColor: "#CCC",
+  borderRadius: 20,
+  paddingVertical: 10,
+  alignItems: "center",
+},
+textoBotonFeedbackNo: { color: "#555", fontWeight: "600", fontSize: 13 },
+cardFeedbackEnviado: {
+  backgroundColor: "#F5F5F5",
+  borderRadius: 16,
+  padding: 14,
+  marginTop: 16,
+  alignItems: "center",
+},
+textoFeedbackEnviado: { fontSize: 13, color: "#666" },
 });

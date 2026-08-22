@@ -77,7 +77,7 @@ export default function VerificarCodigoScreen() {
     setCargando(false);
 
     // Verificado correctamente -> lo mandamos al inicio
-    router.replace("/preferencias");
+    router.replace("/home");
   }
 
   async function reenviarCodigo() {

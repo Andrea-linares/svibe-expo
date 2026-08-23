@@ -1,3 +1,4 @@
+import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -19,6 +20,7 @@ type Hito = {
 };
 
 export default function OcultoScreen() {
+  const { colores } = useTema();
   const [lugares, setLugares] = useState<Hito[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -45,9 +47,11 @@ export default function OcultoScreen() {
   }
 
   return (
-    <ScrollView style={styles.contenedor}>
-      <Text style={styles.tituloSeccion}>Lugares ocultos</Text>
-      <Text style={styles.subtitulo}>
+    <ScrollView style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
+      <Text style={[styles.tituloSeccion, { color: colores.texto }]}>
+        Lugares ocultos
+      </Text>
+      <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
         Destinos poco conocidos para explorar
       </Text>
 
@@ -55,18 +59,27 @@ export default function OcultoScreen() {
         {lugares.map((hito) => (
           <TouchableOpacity
             key={hito.id}
-            style={styles.cardGrid}
+            style={[styles.cardGrid, { backgroundColor: colores.tarjeta }]}
             onPress={() => router.push(`/hito/${hito.id}`)}
           >
             <Image
               source={obtenerImagenPrincipal(hito)}
               style={styles.imagenGrid}
             />
-            <Text style={styles.nombreGrid} numberOfLines={2}>
+            <Text
+              style={[styles.nombreGrid, { color: colores.texto }]}
+              numberOfLines={2}
+            >
               {hito.nombre}
             </Text>
             {hito.direccion_referencia && (
-              <Text style={styles.ubicacionGrid} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.ubicacionGrid,
+                  { color: colores.textoSecundario },
+                ]}
+                numberOfLines={1}
+              >
                 📍 {hito.direccion_referencia}
               </Text>
             )}
@@ -81,16 +94,14 @@ export default function OcultoScreen() {
 
 function obtenerImagenPrincipal(hito: Hito) {
   if (hito.hito_imagenes && hito.hito_imagenes.length > 0) {
-    const ordenadas = [...hito.hito_imagenes].sort(
-      (a, b) => a.orden - b.orden,
-    );
+    const ordenadas = [...hito.hito_imagenes].sort((a, b) => a.orden - b.orden);
     return { uri: ordenadas[0].url };
   }
   return require("@/assets/images/partial-react-logo.png");
 }
 
 const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: "#F5F5F5" },
+  contenedor: { flex: 1 },
   centrado: { flex: 1, justifyContent: "center", alignItems: "center" },
   tituloSeccion: {
     fontSize: 22,
@@ -100,7 +111,6 @@ const styles = StyleSheet.create({
   },
   subtitulo: {
     fontSize: 14,
-    color: "#666",
     marginHorizontal: 16,
     marginTop: 4,
     marginBottom: 16,
@@ -113,7 +123,6 @@ const styles = StyleSheet.create({
   },
   cardGrid: {
     width: "48%",
-    backgroundColor: "#fff",
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 16,
@@ -125,6 +134,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 8,
     fontSize: 12,
-    color: "#666",
   },
 });

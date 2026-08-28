@@ -4,13 +4,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Hito = {
@@ -33,26 +33,243 @@ type Pregunta = {
   explicacion: string;
 };
 
-type RespuestaUsuario = {
-  preguntaId: string;
-  opcion: number;
-};
+/* =========================================================
+   FUNCIONES AUXILIARES
+========================================================= */
+
+function mezclarArray<T>(array: T[]): T[] {
+  return [...array].sort(() => Math.random() - 0.5);
+}
+
+/*
+  Convierte textos largos en respuestas cortas.
+
+  Ejemplo:
+  "Fue construido durante el período colonial..."
+  ->
+  "Época colonial"
+*/
+
+function crearRespuestaCorta(texto: string, tipo: string): string {
+  const limpio = texto
+    .replace(/\s+/g, " ")
+    .replace(/\([^)]*\)/g, "")
+    .trim();
+
+  if (!limpio) return "Información histórica";
+
+  /*
+    Primero intentamos detectar conceptos importantes.
+  */
+
+  const conceptos = [
+    {
+      palabras: ["colonial", "colonia", "español"],
+      respuesta: "Época colonial",
+    },
+    {
+      palabras: ["indígena", "indigena", "maya", "pipil", "nahua"],
+      respuesta: "Origen indígena",
+    },
+    {
+      palabras: ["siglo xvi", "siglo XVI", "1500", "1510", "1520", "1530"],
+      respuesta: "Siglo XVI",
+    },
+    {
+      palabras: ["siglo xvii", "siglo XVII", "1600", "1610", "1620"],
+      respuesta: "Siglo XVII",
+    },
+    {
+      palabras: ["siglo xviii", "siglo XVIII", "1700", "1710", "1720"],
+      respuesta: "Siglo XVIII",
+    },
+    {
+      palabras: ["siglo xix", "siglo XIX", "1800", "1810", "1820"],
+      respuesta: "Siglo XIX",
+    },
+    {
+      palabras: ["siglo xx", "siglo XX", "1900", "1910", "1920"],
+      respuesta: "Siglo XX",
+    },
+    {
+      palabras: ["iglesia", "religioso", "religiosa", "católico", "catolica"],
+      respuesta: "Tradición religiosa",
+    },
+    {
+      palabras: ["volcán", "volcan", "volcánico", "volcanico"],
+      respuesta: "Origen volcánico",
+    },
+    {
+      palabras: ["arqueológico", "arqueologica", "arqueológico"],
+      respuesta: "Patrimonio arqueológico",
+    },
+    {
+      palabras: ["natural", "naturaleza", "bosque", "flora", "fauna"],
+      respuesta: "Patrimonio natural",
+    },
+    {
+      palabras: ["leyenda", "mito", "mitología", "mitologia"],
+      respuesta: "Tradición popular",
+    },
+    {
+      palabras: ["batalla", "guerra", "conflicto"],
+      respuesta: "Acontecimiento histórico",
+    },
+    {
+      palabras: ["fundado", "fundada", "fundación", "fundacion"],
+      respuesta: "Fundación histórica",
+    },
+  ];
+
+  const minuscula = limpio.toLowerCase();
+
+  for (const concepto of conceptos) {
+    if (concepto.palabras.some((palabra) => minuscula.includes(palabra))) {
+      return concepto.respuesta;
+    }
+  }
+
+  /*
+    Si no encontramos un concepto conocido,
+    tomamos las primeras palabras importantes,
+    pero nunca devolvemos toda la descripción.
+  */
+
+  const palabras = limpio
+    .split(" ")
+    .filter((palabra) => palabra.length > 3)
+    .filter(
+      (palabra) =>
+        ![
+          "este",
+          "esta",
+          "lugar",
+          "sitio",
+          "ubicado",
+          "ubicada",
+          "conocido",
+          "conocida",
+          "donde",
+          "tiene",
+          "cuenta",
+          "forma",
+          "parte",
+          "través",
+          "través",
+          "también",
+        ].includes(palabra.toLowerCase()),
+    );
+
+  if (palabras.length >= 2) {
+    return palabras.slice(0, 2).join(" ");
+  }
+
+  return palabras[0] ?? "Dato histórico";
+}
+
+/*
+  Obtiene el contenido disponible de un lugar.
+*/
+
+function obtenerContenido(
+  hito: Hito,
+  tipo: string,
+): string | null {
+  if (tipo === "Historia") return hito.historia;
+  if (tipo === "Dato curioso") return hito.dato_curioso;
+  if (tipo === "Características") return hito.descripcion;
+  if (tipo === "Leyenda") return hito.leyenda;
+
+  return null;
+}
+
+/*
+  Genera respuestas incorrectas cortas pero parecidas.
+*/
+
+function generarDistractores(
+  correcta: string,
+  tipo: string,
+  hitos: Hito[],
+  hitoActual: Hito,
+): string[] {
+  const respuestas = new Set<string>();
+
+  /*
+    Primero obtenemos conceptos de otros lugares.
+  */
+
+  for (const hito of mezclarArray(hitos)) {
+    if (hito.id === hitoActual.id) continue;
+
+    const contenido = obtenerContenido(hito, tipo);
+
+    if (!contenido) continue;
+
+    const respuesta = crearRespuestaCorta(
+      contenido,
+      tipo,
+    );
+
+    if (
+      respuesta &&
+      respuesta.toLowerCase() !== correcta.toLowerCase()
+    ) {
+      respuestas.add(respuesta);
+    }
+
+    if (respuestas.size >= 3) break;
+  }
+
+  /*
+    Si no hay suficientes respuestas diferentes,
+    usamos respuestas genéricas relacionadas.
+  */
+
+  const genericas = [
+    "Época colonial",
+    "Origen indígena",
+    "Tradición religiosa",
+    "Patrimonio natural",
+    "Patrimonio cultural",
+    "Acontecimiento histórico",
+    "Tradición popular",
+    "Origen volcánico",
+    "Patrimonio arqueológico",
+    "Siglo XVI",
+    "Siglo XVII",
+    "Siglo XVIII",
+    "Siglo XIX",
+    "Siglo XX",
+    "Fundación histórica",
+  ];
+
+  for (const respuesta of mezclarArray(genericas)) {
+    if (
+      respuesta.toLowerCase() !== correcta.toLowerCase()
+    ) {
+      respuestas.add(respuesta);
+    }
+
+    if (respuestas.size >= 3) break;
+  }
+
+  return Array.from(respuestas).slice(0, 3);
+}
+
+/* =========================================================
+   PANTALLA QUIZ
+========================================================= */
 
 export default function QuizScreen() {
   const { colores } = useTema();
 
-  const [preguntas, setPreguntas] = useState<Pregunta[]>(
-    [],
-  );
-
+  const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
   const [indice, setIndice] = useState(0);
-
   const [respuestaSeleccionada, setRespuestaSeleccionada] =
     useState<number | null>(null);
 
-  const [respuestas, setRespuestas] = useState<
-    RespuestaUsuario[]
-  >([]);
+  const [respuestas, setRespuestas] = useState<number[]>([]);
 
   const [finalizado, setFinalizado] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -62,6 +279,10 @@ export default function QuizScreen() {
     cargarPreguntas();
   }, []);
 
+  /* =========================================================
+     CARGAR LUGARES
+  ========================================================= */
+
   async function cargarPreguntas() {
     setCargando(true);
 
@@ -69,20 +290,16 @@ export default function QuizScreen() {
       const { data, error } = await supabase
         .from("hitos")
         .select(
-          `
-            id,
-            nombre,
-            descripcion,
-            dato_curioso,
-            historia,
-            leyenda
-          `,
+          "id, nombre, descripcion, dato_curioso, historia, leyenda",
         )
         .eq("es_lugar_oculto", false)
         .order("nombre", { ascending: true });
 
       if (error) {
-        console.error("Error cargando hitos:", error);
+        console.log(
+          "Error cargando lugares:",
+          error,
+        );
 
         Alert.alert(
           "Error",
@@ -103,7 +320,10 @@ export default function QuizScreen() {
       setRespuestaSeleccionada(null);
       setFinalizado(false);
     } catch (error) {
-      console.error("Error quiz:", error);
+      console.log(
+        "Error inesperado:",
+        error,
+      );
 
       Alert.alert(
         "Error",
@@ -114,10 +334,14 @@ export default function QuizScreen() {
     }
   }
 
+  /* =========================================================
+     CONSTRUIR PREGUNTAS
+  ========================================================= */
+
   function construirPreguntas(
     hitos: Hito[],
   ): Pregunta[] {
-    const generadas: Pregunta[] = [];
+    const preguntasGeneradas: Pregunta[] = [];
 
     hitos.forEach((hito, index) => {
       const campos = [
@@ -146,7 +370,7 @@ export default function QuizScreen() {
         } =>
           Boolean(
             item.texto &&
-              item.texto.trim().length > 10,
+              item.texto.trim(),
           ),
       );
 
@@ -154,138 +378,106 @@ export default function QuizScreen() {
         return;
       }
 
+      /*
+        Elegimos un tipo diferente dependiendo
+        del lugar.
+      */
+
       const contenido =
         campos[index % campos.length];
 
-      const candidatos = hitos
-        .filter(
-          (otro) => otro.id !== hito.id,
-        )
-        .flatMap((otro) => [
-          obtenerContenido(
-            otro,
-            contenido.tipo,
-          ),
-        ])
-        .filter(
-          (texto): texto is string =>
-            Boolean(
-              texto &&
-                texto.trim() &&
-                texto !== contenido.texto,
-            ),
-        );
+      /*
+        Convertimos la información larga
+        en una respuesta corta.
+      */
+
+      const correcta = crearRespuestaCorta(
+        contenido.texto,
+        contenido.tipo,
+      );
+
+      /*
+        Creamos respuestas incorrectas
+        del mismo estilo.
+      */
 
       const distractores =
-        eliminarDuplicados(candidatos).slice(
-          0,
-          3,
+        generarDistractores(
+          correcta,
+          contenido.tipo,
+          hitos,
+          hito,
         );
 
       if (distractores.length < 3) {
         return;
       }
 
-      const opcionesOriginales = [
-        contenido.texto,
+      const opciones = mezclarArray([
+        correcta,
         ...distractores,
-      ];
+      ]);
 
-      const opciones =
-        mezclarArray(opcionesOriginales);
+      const indiceCorrecto =
+        opciones.indexOf(correcta);
 
-      const correcta = opciones.indexOf(
-        contenido.texto,
-      );
+      /*
+        IMPORTANTE:
+        La pregunta sí menciona el lugar.
+        Las respuestas NO mencionan el lugar.
+      */
 
-      generadas.push({
-        id: `${hito.id}-${contenido.tipo}-${index}`,
+      let textoPregunta = "";
+
+      if (
+        contenido.tipo === "Historia"
+      ) {
+        textoPregunta =
+          `¿Qué aspecto histórico se relaciona con "${hito.nombre}"?`;
+      } else if (
+        contenido.tipo === "Dato curioso"
+      ) {
+        textoPregunta =
+          `¿Cuál es un dato relacionado con "${hito.nombre}"?`;
+      } else if (
+        contenido.tipo === "Características"
+      ) {
+        textoPregunta =
+          `¿Qué característica corresponde a "${hito.nombre}"?`;
+      } else {
+        textoPregunta =
+          `¿Qué elemento de tradición se relaciona con "${hito.nombre}"?`;
+      }
+
+      preguntasGeneradas.push({
+        id: `${hito.id}-${index}`,
         hitoId: hito.id,
         lugar: hito.nombre,
         tipo: contenido.tipo,
-        pregunta: construirTextoPregunta(
-          hito.nombre,
-          contenido.tipo,
-        ),
+        pregunta: textoPregunta,
         opciones,
-        correcta,
+        correcta: indiceCorrecto,
+        /*
+          Para la explicación mostramos
+          la información real.
+        */
         explicacion: contenido.texto,
       });
     });
 
-    return mezclarArray(generadas);
+    /*
+      Mezclamos las preguntas para que
+      no salgan siempre en el mismo orden.
+    */
+
+    return mezclarArray(
+      preguntasGeneradas,
+    );
   }
 
-  function construirTextoPregunta(
-    nombreLugar: string,
-    tipo: string,
-  ) {
-    if (tipo === "Historia") {
-      return `¿Cuál de las siguientes afirmaciones corresponde a la historia de "${nombreLugar}"?`;
-    }
-
-    if (tipo === "Dato curioso") {
-      return `¿Cuál de estos datos curiosos corresponde a "${nombreLugar}"?`;
-    }
-
-    if (tipo === "Características") {
-      return `¿Cuál de estas características corresponde a "${nombreLugar}"?`;
-    }
-
-    return `¿Cuál de las siguientes opciones corresponde a la leyenda de "${nombreLugar}"?`;
-  }
-
-  function obtenerContenido(
-    hito: Hito,
-    tipo: string,
-  ): string | null {
-    if (tipo === "Historia") {
-      return hito.historia;
-    }
-
-    if (tipo === "Dato curioso") {
-      return hito.dato_curioso;
-    }
-
-    if (tipo === "Características") {
-      return hito.descripcion;
-    }
-
-    if (tipo === "Leyenda") {
-      return hito.leyenda;
-    }
-
-    return null;
-  }
-
-  function eliminarDuplicados(
-    valores: string[],
-  ) {
-    return Array.from(new Set(valores));
-  }
-
-  function mezclarArray<T>(
-    array: T[],
-  ): T[] {
-    const copia = [...array];
-
-    for (
-      let i = copia.length - 1;
-      i > 0;
-      i--
-    ) {
-      const j = Math.floor(
-        Math.random() * (i + 1),
-      );
-
-      [copia[i], copia[j]] = [
-        copia[j],
-        copia[i],
-      ];
-    }
-
-    return copia;
-  }
+  /* =========================================================
+     SELECCIONAR RESPUESTA
+  ========================================================= */
 
   function seleccionarRespuesta(
     opcion: number,
@@ -297,134 +489,150 @@ export default function QuizScreen() {
       return;
     }
 
-    const preguntaActual =
-      preguntas[indice];
-
-    if (!preguntaActual) {
-      return;
-    }
-
     setRespuestaSeleccionada(opcion);
 
     setRespuestas((anteriores) => [
-      ...anteriores.filter(
-        (item) =>
-          item.preguntaId !==
-          preguntaActual.id,
-      ),
-      {
-        preguntaId: preguntaActual.id,
-        opcion,
-      },
+      ...anteriores,
+      opcion,
     ]);
   }
 
+  /* =========================================================
+     SIGUIENTE
+  ========================================================= */
+
   async function siguientePregunta() {
-    if (respuestaSeleccionada === null) {
+    if (
+      respuestaSeleccionada === null
+    ) {
       return;
     }
 
-    if (indice < preguntas.length - 1) {
-      setIndice((actual) => actual + 1);
+    if (
+      indice <
+      preguntas.length - 1
+    ) {
+      setIndice(
+        (actual) => actual + 1,
+      );
+
       setRespuestaSeleccionada(null);
     } else {
       await finalizarQuiz();
     }
   }
 
-  async function finalizarQuiz() {
-    if (guardando) return;
+  /* =========================================================
+     FINALIZAR
+  ========================================================= */
 
+  async function finalizarQuiz() {
     setGuardando(true);
 
     try {
-      const aciertos = preguntas.reduce(
-        (total, pregunta) => {
-          const respuesta =
-            respuestas.find(
-              (item) =>
-                item.preguntaId ===
-                pregunta.id,
+      const respuestasFinales = [
+        ...respuestas,
+      ];
+
+      const aciertos =
+        preguntas.reduce(
+          (total, pregunta, i) => {
+            return (
+              total +
+              (respuestasFinales[i] ===
+              pregunta.correcta
+                ? 1
+                : 0)
             );
+          },
+          0,
+        );
 
-          return (
-            total +
-            (respuesta?.opcion ===
-            pregunta.correcta
-              ? 1
-              : 0)
-          );
-        },
-        0,
-      );
-
-      const puntos = aciertos * 5;
+      const puntos =
+        aciertos * 5;
 
       const { data: sesion } =
         await supabase.auth.getUser();
 
       if (sesion?.user) {
-        const { error: resultadoError } =
-          await supabase
-            .from("quiz_resultados")
-            .insert({
-              usuario_id:
-                sesion.user.id,
-              aciertos,
-              total_preguntas:
-                preguntas.length,
-              puntos_obtenidos: puntos,
-            });
+        const {
+          error: errorResultado,
+        } = await supabase
+          .from("quiz_resultados")
+          .insert({
+            usuario_id:
+              sesion.user.id,
+            aciertos,
+            total_preguntas:
+              preguntas.length,
+            puntos_obtenidos:
+              puntos,
+          });
 
-        if (resultadoError) {
-          console.error(
+        if (errorResultado) {
+          console.log(
             "Error guardando resultado:",
-            resultadoError,
+            errorResultado,
           );
         }
 
         await actualizarProgreso(
           sesion.user.id,
+          puntos,
         );
       }
+
+      setFinalizado(true);
     } catch (error) {
-      console.error(
+      console.log(
         "Error finalizando quiz:",
         error,
       );
 
       Alert.alert(
-        "Aviso",
-        "El resultado se mostrará, pero hubo un problema guardándolo.",
+        "Error",
+        "No se pudo guardar el resultado.",
       );
     } finally {
-      setFinalizado(true);
       setGuardando(false);
     }
   }
 
+  /* =========================================================
+     ACTUALIZAR NIVEL
+  ========================================================= */
+
   async function actualizarProgreso(
     usuarioId: string,
+    puntosQuiz: number,
   ) {
-    const { data: visitas } =
-      await supabase
-        .from("interacciones_usuario")
+    try {
+      const {
+        data: visitas,
+      } = await supabase
+        .from(
+          "interacciones_usuario",
+        )
         .select("hito_id")
-        .eq("usuario_id", usuarioId)
+        .eq(
+          "usuario_id",
+          usuarioId,
+        )
         .eq(
           "tipo_interaccion",
           "visita",
         );
 
-    const lugaresVisitados =
-      new Set(
-        (visitas ?? []).map(
-          (item) => item.hito_id,
-        ),
-      );
+      const lugaresVisitados =
+        new Set(
+          (visitas ?? []).map(
+            (item) => item.hito_id,
+          ),
+        );
 
-    const { data: resultados } =
-      await supabase
+      const {
+        data: resultados,
+      } = await supabase
         .from("quiz_resultados")
         .select(
           "puntos_obtenidos",
@@ -434,48 +642,78 @@ export default function QuizScreen() {
           usuarioId,
         );
 
-    const puntosQuiz =
-      (resultados ?? []).reduce(
-        (total, resultado) =>
-          total +
-          (resultado.puntos_obtenidos ??
-            0),
-        0,
+      const puntosQuizTotales =
+        (resultados ?? []).reduce(
+          (total, resultado) =>
+            total +
+            (resultado.puntos_obtenidos ??
+              0),
+          0,
+        );
+
+      /*
+        10 puntos por lugar visitado.
+      */
+
+      const puntosVisitas =
+        lugaresVisitados.size * 10;
+
+      const puntosTotales =
+        puntosVisitas +
+        puntosQuizTotales;
+
+      const nivel =
+        calcularNivel(
+          puntosTotales,
+        );
+
+      const { error } =
+        await supabase
+          .from(
+            "progreso_usuario",
+          )
+          .upsert({
+            usuario_id:
+              usuarioId,
+            puntos:
+              puntosTotales,
+            nivel,
+            actualizado_en:
+              new Date().toISOString(),
+          });
+
+      if (error) {
+        console.log(
+          "Error actualizando progreso:",
+          error,
+        );
+      }
+    } catch (error) {
+      console.log(
+        "Error en progreso:",
+        error,
       );
-
-    const puntosVisitas =
-      lugaresVisitados.size * 10;
-
-    const puntosTotales =
-      puntosVisitas + puntosQuiz;
-
-    const nivel =
-      calcularNivel(puntosTotales);
-
-    await supabase
-      .from("progreso_usuario")
-      .upsert(
-        {
-          usuario_id: usuarioId,
-          puntos: puntosTotales,
-          nivel,
-          actualizado_en:
-            new Date().toISOString(),
-        },
-        {
-          onConflict:
-            "usuario_id",
-        },
-      );
+    }
   }
+
+  /* =========================================================
+     NIVELES
+  ========================================================= */
 
   function calcularNivel(
     puntos: number,
   ) {
-    if (puntos >= 500) return 5;
-    if (puntos >= 300) return 4;
-    if (puntos >= 150) return 3;
-    if (puntos >= 50) return 2;
+    if (puntos >= 500)
+      return 5;
+
+    if (puntos >= 300)
+      return 4;
+
+    if (puntos >= 150)
+      return 3;
+
+    if (puntos >= 50)
+      return 2;
 
     return 1;
   }
@@ -483,42 +721,41 @@ export default function QuizScreen() {
   const preguntaActual =
     preguntas[indice];
 
+  /* =========================================================
+     RESULTADO
+  ========================================================= */
+
   const resultado = useMemo(() => {
     if (!finalizado) {
       return null;
     }
 
     return preguntas.map(
-      (pregunta) => {
-        const respuesta =
-          respuestas.find(
-            (item) =>
-              item.preguntaId ===
-              pregunta.id,
-          );
+      (pregunta, i) => ({
+        pregunta,
 
-        const opcion =
-          respuesta?.opcion;
+        respuesta:
+          respuestas[i] !==
+          undefined
+            ? pregunta.opciones[
+                respuestas[i]
+              ]
+            : "Sin responder",
 
-        return {
-          pregunta,
-          respuesta:
-            opcion !== undefined
-              ? pregunta.opciones[
-                  opcion
-                ]
-              : "Sin responder",
-          correcta:
-            opcion ===
-            pregunta.correcta,
-        };
-      },
+        correcta:
+          respuestas[i] ===
+          pregunta.correcta,
+      }),
     );
   }, [
     finalizado,
     preguntas,
     respuestas,
   ]);
+
+  /* =========================================================
+     CARGANDO
+  ========================================================= */
 
   if (cargando) {
     return (
@@ -545,13 +782,19 @@ export default function QuizScreen() {
             },
           ]}
         >
-          Preparando quiz cultural...
+          Preparando quiz...
         </Text>
       </View>
     );
   }
 
-  if (preguntas.length === 0) {
+  /* =========================================================
+     SIN PREGUNTAS
+  ========================================================= */
+
+  if (
+    preguntas.length === 0
+  ) {
     return (
       <View
         style={[
@@ -564,7 +807,7 @@ export default function QuizScreen() {
       >
         <Ionicons
           name="help-circle-outline"
-          size={64}
+          size={60}
           color="#3B6FA0"
         />
 
@@ -589,15 +832,23 @@ export default function QuizScreen() {
             },
           ]}
         >
-          Todavía no hay suficientes datos en los
-          lugares para generar preguntas.
+          Los lugares todavía no
+          tienen suficiente
+          información para generar
+          preguntas.
         </Text>
 
         <TouchableOpacity
           style={styles.boton}
-          onPress={() => router.back()}
+          onPress={() =>
+            router.back()
+          }
         >
-          <Text style={styles.textoBoton}>
+          <Text
+            style={
+              styles.textoBoton
+            }
+          >
             Volver
           </Text>
         </TouchableOpacity>
@@ -605,13 +856,19 @@ export default function QuizScreen() {
     );
   }
 
+  /* =========================================================
+     RESULTADO FINAL
+  ========================================================= */
+
   if (finalizado) {
     const aciertos =
       resultado?.filter(
-        (item) => item.correcta,
+        (item) =>
+          item.correcta,
       ).length ?? 0;
 
-    const puntos = aciertos * 5;
+    const puntos =
+      aciertos * 5;
 
     return (
       <ScrollView
@@ -626,7 +883,9 @@ export default function QuizScreen() {
           styles.contenido
         }
       >
-        <View style={styles.encabezado}>
+        <View
+          style={styles.encabezado}
+        >
           <TouchableOpacity
             onPress={() =>
               router.back()
@@ -635,7 +894,9 @@ export default function QuizScreen() {
             <Ionicons
               name="arrow-back"
               size={26}
-              color={colores.texto}
+              color={
+                colores.texto
+              }
             />
           </TouchableOpacity>
 
@@ -652,7 +913,9 @@ export default function QuizScreen() {
           </Text>
 
           <View
-            style={{ width: 26 }}
+            style={{
+              width: 26,
+            }}
           />
         </View>
 
@@ -665,7 +928,9 @@ export default function QuizScreen() {
             },
           ]}
         >
-          <Text style={styles.trofeo}>
+          <Text
+            style={styles.trofeo}
+          >
             🏆
           </Text>
 
@@ -685,7 +950,8 @@ export default function QuizScreen() {
             style={[
               styles.puntuacion,
               {
-                color: "#3B6FA0",
+                color:
+                  "#3B6FA0",
               },
             ]}
           >
@@ -719,16 +985,18 @@ export default function QuizScreen() {
         </Text>
 
         {resultado?.map(
-          (item, index) => (
+          (
+            item,
+            index,
+          ) => (
             <View
-              key={
-                item.pregunta.id
-              }
+              key={index}
               style={[
                 styles.revisionCard,
                 {
                   backgroundColor:
                     colores.tarjeta,
+
                   borderLeftColor:
                     item.correcta
                       ? "#2E7D32"
@@ -757,7 +1025,10 @@ export default function QuizScreen() {
                   },
                 ]}
               >
-                {item.pregunta.pregunta}
+                {
+                  item.pregunta
+                    .pregunta
+                }
               </Text>
 
               <Text
@@ -766,8 +1037,10 @@ export default function QuizScreen() {
                     item.correcta
                       ? "#2E7D32"
                       : "#D32F2F",
+
                   fontWeight:
                     "bold",
+
                   marginTop: 8,
                 }}
               >
@@ -821,8 +1094,10 @@ export default function QuizScreen() {
                   },
                 ]}
               >
-                {item.pregunta
-                  .explicacion}
+                {
+                  item.pregunta
+                    .explicacion
+                }
               </Text>
             </View>
           ),
@@ -830,17 +1105,27 @@ export default function QuizScreen() {
 
         <TouchableOpacity
           style={styles.boton}
-          onPress={cargarPreguntas}
+          onPress={
+            cargarPreguntas
+          }
         >
-          <Text style={styles.textoBoton}>
+          <Text
+            style={
+              styles.textoBoton
+            }
+          >
             Intentar otro quiz
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.botonSecundario}
+          style={
+            styles.botonSecundario
+          }
           onPress={() =>
-            router.push("/niveles")
+            router.push(
+              "/niveles",
+            )
           }
         >
           <Text
@@ -855,6 +1140,10 @@ export default function QuizScreen() {
     );
   }
 
+  /* =========================================================
+     QUIZ
+  ========================================================= */
+
   return (
     <ScrollView
       style={[
@@ -868,7 +1157,9 @@ export default function QuizScreen() {
         styles.contenido
       }
     >
-      <View style={styles.encabezado}>
+      <View
+        style={styles.encabezado}
+      >
         <TouchableOpacity
           onPress={() =>
             router.back()
@@ -877,7 +1168,9 @@ export default function QuizScreen() {
           <Ionicons
             name="arrow-back"
             size={26}
-            color={colores.texto}
+            color={
+              colores.texto
+            }
           />
         </TouchableOpacity>
 
@@ -894,9 +1187,13 @@ export default function QuizScreen() {
         </Text>
 
         <View
-          style={{ width: 26 }}
+          style={{
+            width: 26,
+          }}
         />
       </View>
+
+      {/* PROGRESO */}
 
       <View
         style={
@@ -940,6 +1237,8 @@ export default function QuizScreen() {
         </View>
       </View>
 
+      {/* LUGAR */}
+
       <View
         style={[
           styles.lugarCard,
@@ -967,6 +1266,8 @@ export default function QuizScreen() {
           {preguntaActual.lugar}
         </Text>
       </View>
+
+      {/* PREGUNTA */}
 
       <View
         style={[
@@ -1002,8 +1303,13 @@ export default function QuizScreen() {
         </Text>
       </View>
 
+      {/* RESPUESTAS */}
+
       {preguntaActual.opciones.map(
-        (opcion, opcionIndex) => {
+        (
+          opcion,
+          opcionIndex,
+        ) => {
           const seleccionada =
             respuestaSeleccionada ===
             opcionIndex;
@@ -1016,11 +1322,13 @@ export default function QuizScreen() {
                   opcionIndex,
                 )
               }
+              activeOpacity={0.8}
               style={[
                 styles.opcion,
                 {
                   backgroundColor:
                     colores.tarjeta,
+
                   borderColor:
                     seleccionada
                       ? "#3B6FA0"
@@ -1045,6 +1353,7 @@ export default function QuizScreen() {
                       seleccionada
                         ? "#fff"
                         : colores.texto,
+
                     fontWeight:
                       "bold",
                   }}
@@ -1072,28 +1381,39 @@ export default function QuizScreen() {
         },
       )}
 
+      {/* BOTÓN */}
+
       <TouchableOpacity
         disabled={
           respuestaSeleccionada ===
-            null || guardando
+            null ||
+          guardando
         }
-        onPress={siguientePregunta}
+        onPress={
+          siguientePregunta
+        }
         style={[
           styles.boton,
           {
             opacity:
               respuestaSeleccionada ===
-                null || guardando
+                null ||
+              guardando
                 ? 0.5
                 : 1,
           },
         ]}
       >
-        <Text style={styles.textoBoton}>
+        <Text
+          style={
+            styles.textoBoton
+          }
+        >
           {guardando
             ? "Guardando..."
             : indice ===
-                preguntas.length - 1
+                preguntas.length -
+                  1
               ? "Finalizar quiz"
               : "Siguiente"}
         </Text>
@@ -1101,6 +1421,10 @@ export default function QuizScreen() {
     </ScrollView>
   );
 }
+
+/* =========================================================
+   ESTILOS
+========================================================= */
 
 const styles = StyleSheet.create({
   contenedor: {
@@ -1114,7 +1438,8 @@ const styles = StyleSheet.create({
 
   centrado: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent:
+      "center",
     alignItems: "center",
     padding: 30,
   },
@@ -1128,7 +1453,8 @@ const styles = StyleSheet.create({
     marginTop: 45,
     marginBottom: 20,
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     alignItems: "center",
   },
 
@@ -1150,6 +1476,8 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
 
+  /* PROGRESO */
+
   progresoContainer: {
     marginBottom: 18,
   },
@@ -1167,14 +1495,16 @@ const styles = StyleSheet.create({
 
   progreso: {
     height: 7,
-    backgroundColor: "#3B6FA0",
+    backgroundColor:
+      "#3B6FA0",
     borderRadius: 10,
   },
+
+  /* LUGAR */
 
   lugarCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
     padding: 14,
     borderRadius: 14,
     marginBottom: 14,
@@ -1184,19 +1514,32 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 15,
     flex: 1,
+    marginLeft: 8,
   },
+
+  /* PREGUNTA */
 
   preguntaCard: {
     padding: 20,
     borderRadius: 18,
     marginBottom: 16,
+
     elevation: 2,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
   },
 
   tipoPregunta: {
     fontSize: 12,
     fontWeight: "bold",
-    textTransform: "uppercase",
+    textTransform:
+      "uppercase",
     marginBottom: 10,
   },
 
@@ -1206,37 +1549,77 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
 
+  /* RESPUESTAS */
+
   opcion: {
-    minHeight: 70,
+    minHeight: 68,
+
     borderWidth: 1.5,
     borderRadius: 16,
+
     marginBottom: 12,
-    padding: 12,
+
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+
     flexDirection: "row",
     alignItems: "center",
+
+    /*
+      Esto evita que el texto
+      quede cortado.
+    */
+
+    width: "100%",
   },
 
   letra: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: "center",
+
+    justifyContent:
+      "center",
     alignItems: "center",
+
     marginRight: 12,
+
+    flexShrink: 0,
   },
 
   opcionTexto: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
+
+    fontSize: 15,
+
+    lineHeight: 21,
+
+    /*
+      Importante para que
+      React Native pueda hacer
+      salto de línea.
+    */
+
+    flexShrink: 1,
+
+    includeFontPadding: true,
   },
 
+  /* BOTONES */
+
   boton: {
-    backgroundColor: "#3B6FA0",
+    backgroundColor:
+      "#3B6FA0",
+
     paddingVertical: 15,
+
     borderRadius: 16,
+
     alignItems: "center",
+
     marginTop: 10,
+
+    width: "100%",
   },
 
   textoBoton: {
@@ -1247,11 +1630,18 @@ const styles = StyleSheet.create({
 
   botonSecundario: {
     borderWidth: 1,
-    borderColor: "#3B6FA0",
+    borderColor:
+      "#3B6FA0",
+
     paddingVertical: 15,
+
     borderRadius: 16,
+
     alignItems: "center",
+
     marginTop: 12,
+
+    width: "100%",
   },
 
   textoBotonSecundario: {
@@ -1259,11 +1649,22 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 
+  /* RESULTADO */
+
   resultadoCard: {
     borderRadius: 22,
     padding: 28,
     alignItems: "center",
+
     elevation: 3,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
   },
 
   trofeo: {
@@ -1316,12 +1717,14 @@ const styles = StyleSheet.create({
   respuestaRevision: {
     marginTop: 6,
     fontSize: 13,
+    lineHeight: 19,
   },
 
   respuestaCorrecta: {
     marginTop: 6,
     fontWeight: "600",
     fontSize: 13,
+    lineHeight: 19,
   },
 
   explicacion: {

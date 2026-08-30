@@ -1,10 +1,10 @@
 import InfoModal from "@/components/InfoModal";
+import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { supabase } from "@/lib/supabase";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
+  ActivityIndicator, Alert, Dimensions,
   FlatList,
   Image,
   Modal,
@@ -103,11 +103,26 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
       if (sesion?.user && hitoData) {
         setUsuarioId(sesion.user.id);
 
-        supabase.from("interacciones_usuario").insert({
+        const { error: errorVisita } = await supabase
+        .from("interacciones_usuario")
+        .insert({
           usuario_id: sesion.user.id,
           hito_id: id,
           tipo_interaccion: "visita",
         });
+
+        if (errorVisita) {
+        console.log("ERROR AL REGISTRAR VISITA:", JSON.stringify(errorVisita));
+        }
+
+        const nuevasInsignias = await verificarYDesbloquearInsignias(sesion.user.id);
+        if (nuevasInsignias.length > 0) {
+          Alert.alert(
+            "¡Nueva insignia desbloqueada! 🎉",
+            nuevasInsignias.map((i) => `${i.icono ?? "🏅"} ${i.nombre}`).join("\n"),
+          );
+        }
+
           const { data: feedbackPrevio } = await supabase
           .from("interacciones_usuario")
           .select("tipo_interaccion")

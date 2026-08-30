@@ -242,16 +242,7 @@ export default function PerfilScreen() {
         <TouchableOpacity
           style={styles.filaLista}
           activeOpacity={0.6}
-          onPress={() =>
-            Alert.alert(
-              "Logros Obtenidos",
-              logros.length > 0
-                ? logros
-                    .map((l) => `• ${l.insignias?.nombre ?? "Insignia"}`)
-                    .join("\n")
-                : "Todavía no tienes logros obtenidos.",
-            )
-          }
+          onPress={() => router.push("/insignias")}
         >
           <View style={styles.iconoFilaLista}>
             <Ionicons name="trophy-outline" size={19} color="#3B6FA0" />
@@ -264,7 +255,6 @@ export default function PerfilScreen() {
           </View>
           <Ionicons name="chevron-forward" size={20} color="#C4C4C4" />
         </TouchableOpacity>
-      </View>
 
       {/* Cerrar Sesión */}
       <TouchableOpacity
@@ -275,6 +265,7 @@ export default function PerfilScreen() {
         <Ionicons name="log-out-outline" size={18} color="#D32F2F" />
         <Text style={styles.textoBotonCerrarSesion}>Cerrar Sesión</Text>
       </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }

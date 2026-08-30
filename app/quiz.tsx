@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -573,6 +574,14 @@ export default function QuizScreen() {
           console.log(
             "Error guardando resultado:",
             errorResultado,
+          );
+        }
+
+        const nuevasInsignias = await verificarYDesbloquearInsignias(sesion.user.id);
+        if (nuevasInsignias.length > 0) {
+          Alert.alert(
+          "¡Nueva insignia desbloqueada! 🎉",
+          nuevasInsignias.map((i) => `${i.icono ?? "🏅"} ${i.nombre}`).join("\n"),
           );
         }
 

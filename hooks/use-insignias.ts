@@ -7,7 +7,8 @@ import { useCallback, useState } from "react";
 export type CriterioInsignia =
   | { tipo: "visitas_totales"; cantidad: number }
   | { tipo: "visitas_categoria"; categoria_id: number; cantidad: number }
-  | { tipo: "quiz_completado" };
+  | { tipo: "quiz_completado" }
+  | { tipo: "otorgada_por_reto" };
 
 export interface Insignia {
   id: number;
@@ -39,6 +40,8 @@ function describirCriterio(criterio: CriterioInsignia | null): string {
       return `Visita ${criterio.cantidad} hitos de categoría histórica`;
     case "quiz_completado":
       return "Completa el quiz cultural";
+    case "otorgada_por_reto":
+      return "Se obtiene al completar un reto";
     default:
       return "Requisito no definido";
   }

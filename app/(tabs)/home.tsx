@@ -37,6 +37,7 @@ const OPCIONES_MENU = [
   "Favoritos",
   "Descargas",
   "Logros",
+  "Retos",
   "Quiz",
   "Niveles",
   "Sugerencias",
@@ -424,6 +425,10 @@ export default function HomeScreen() {
       router.push("/niveles");
     } else if (opcion === "Mis preferencias") {
       router.push("/preferencias");
+    } else if (opcion === "Retos") {        
+      router.push("/retos");
+    } else if (opcion === "Logros") { 
+      router.push("/insignias");
     } else {
       console.log(`Opción seleccionada: ${opcion}`);
     }

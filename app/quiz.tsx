@@ -1,5 +1,6 @@
 import { useTema } from "@/contexts/ThemeContext";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
+import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -584,12 +585,20 @@ export default function QuizScreen() {
           nuevasInsignias.map((i) => `${i.icono ?? "🏅"} ${i.nombre}`).join("\n"),
           );
         }
-
+        
         await actualizarProgreso(
           sesion.user.id,
           puntos,
         );
+
+      const retosCompletados = await revisarYCompletarRetos(sesion.user.id);
+      if (retosCompletados.length > 0) {
+        Alert.alert(
+        "¡Reto completado! 🏆",
+        retosCompletados.map((r) => `${r.icono ?? "🏆"} ${r.nombre} (+${r.recompensa_puntos} pts)`).join("\n"),
+      );
       }
+    }
 
       setFinalizado(true);
     } catch (error) {

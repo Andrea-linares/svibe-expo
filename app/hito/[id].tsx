@@ -1,5 +1,6 @@
 import InfoModal from "@/components/InfoModal";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
+import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { supabase } from "@/lib/supabase";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -123,6 +124,14 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
           );
         }
 
+        const retosCompletados = await revisarYCompletarRetos(sesion.user.id);
+        if (retosCompletados.length > 0) {
+          Alert.alert(
+            "¡Reto completado! 🏆",
+              retosCompletados.map((r) => `${r.icono ?? "🏆"} ${r.nombre} (+${r.recompensa_puntos} pts)`).join("\n"),
+          );
+        }
+        
           const { data: feedbackPrevio } = await supabase
           .from("interacciones_usuario")
           .select("tipo_interaccion")

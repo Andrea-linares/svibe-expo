@@ -1,4 +1,6 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
+import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -1516,6 +1518,21 @@ export default function QuizScreen() {
           sesion.user.id,
           puntos
         );
+        const nuevasInsignias = await verificarYDesbloquearInsignias(sesion.user.id);
+        if (nuevasInsignias.length > 0) {
+          Alert.alert(
+            "¡Nueva insignia desbloqueada! 🎉",
+            nuevasInsignias.map((i) => `${i.icono ?? "🏅"} ${i.nombre}`).join("\n"),
+          );
+        }
+
+        const retosCompletados = await revisarYCompletarRetos(sesion.user.id);
+        if (retosCompletados.length > 0) {
+          Alert.alert(
+            "¡Reto completado! 🏆",
+            retosCompletados.map((r) => `${r.icono ?? "🏆"} ${r.nombre} (+${r.recompensa_puntos} pts)`).join("\n"),
+          );
+        }
       }
 
       setRespuestas(

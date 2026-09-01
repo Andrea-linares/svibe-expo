@@ -8,7 +8,10 @@ export type CriterioInsignia =
   | { tipo: "visitas_totales"; cantidad: number }
   | { tipo: "visitas_categoria"; categoria_id: number; cantidad: number }
   | { tipo: "quiz_completado" }
-  | { tipo: "otorgada_por_reto" };
+  | { tipo: "otorgada_por_reto" }
+  | { tipo: "foro_comentarios_totales"; cantidad: number }
+  | { tipo: "quiz_intentos"; cantidad: number }
+  | { tipo: "favoritos_totales"; cantidad: number };
 
 export interface Insignia {
   id: number;
@@ -42,6 +45,14 @@ function describirCriterio(criterio: CriterioInsignia | null): string {
       return "Completa el quiz cultural";
     case "otorgada_por_reto":
       return "Se obtiene al completar un reto";
+    case "foro_comentarios_totales":
+      return criterio.cantidad === 1
+      ? "Deja 1 comentario en el foro"
+      : `Deja ${criterio.cantidad} comentarios en el foro`;
+    case "quiz_intentos":
+      return `Responde el quiz ${criterio.cantidad} veces`;
+    case "favoritos_totales":
+      return `Marca ${criterio.cantidad} hitos como favoritos`;  
     default:
       return "Requisito no definido";
   }
@@ -111,6 +122,33 @@ async function cumpleCriterio(
       return (count ?? 0) >= 1;
     }
 
+    case "foro_comentarios_totales": {
+      const { count, error } = await supabase
+        .from("foro_comentarios")
+        .select("*", { count: "exact", head: true })
+        .eq("usuario_id", usuarioId);
+      if (error) throw error;
+      return (count ?? 0) >= criterio.cantidad;
+    }
+
+    case "quiz_intentos": {
+      const { count, error } = await supabase
+      .from("quiz_resultados")
+      .select("*", { count: "exact", head: true })
+      .eq("usuario_id", usuarioId);
+    if (error) throw error;
+    return (count ?? 0) >= criterio.cantidad;
+    }
+
+    case "favoritos_totales": {
+    const { count, error } = await supabase
+    .from("favoritos")
+    .select("*", { count: "exact", head: true })
+    .eq("usuario_id", usuarioId);
+    if (error) throw error;
+  return (count ?? 0) >= criterio.cantidad;
+  }
+    
     default:
       return false;
   }

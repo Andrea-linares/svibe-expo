@@ -1,9 +1,11 @@
 import { supabase } from "@/lib/supabase";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  ImageBackground,
   StyleSheet,
   Text,
   TextInput,
@@ -12,7 +14,10 @@ import {
 } from "react-native";
 
 export default function VerificarCodigoScreen() {
-  const { correo, nombre } = useLocalSearchParams<{ correo: string; nombre: string; }>();
+  const { correo, nombre } = useLocalSearchParams<{
+    correo: string;
+    nombre: string;
+  }>();
   const [codigo, setCodigo] = useState("");
   const [cargando, setCargando] = useState(false);
 
@@ -43,7 +48,7 @@ export default function VerificarCodigoScreen() {
       return;
     }
 
-     if (data.user) {
+    if (data.user) {
       try {
         // Verificar si el perfil ya existe
         const { data: perfilExistente } = await supabase
@@ -54,10 +59,12 @@ export default function VerificarCodigoScreen() {
 
         // Si no existe, crearlo
         if (!perfilExistente) {
-          const { error: perfilError } = await supabase.from("perfiles").insert({
-            id: data.user.id,
-            nombre: nombre?.trim() || "Usuario",
-          });
+          const { error: perfilError } = await supabase
+            .from("perfiles")
+            .insert({
+              id: data.user.id,
+              nombre: nombre?.trim() || "Usuario",
+            });
 
           if (perfilError) {
             console.log(" Error creando perfil:", perfilError);
@@ -93,59 +100,76 @@ export default function VerificarCodigoScreen() {
   }
 
   return (
-    <View style={styles.contenedor}>
-      <Text style={styles.titulo}>Verifica tu correo</Text>
-      <Text style={styles.subtitulo}>
-        Te enviamos un código de 8 dígitos a{"\n"}
-        <Text style={{ fontWeight: "600" }}>{correo}</Text>
-      </Text>
+    <ImageBackground
+      source={{
+        uri: "https://gdrrajvafwzgnbvjmqtw.supabase.co/storage/v1/object/public/hitos-imagenes/fondo.png",
+      }}
+      style={styles.fondo}
+      resizeMode="cover"
+    >
+      <View style={styles.overlay} />
 
-      <TextInput
-        style={styles.inputCodigo}
-        placeholder="000000"
-        placeholderTextColor="#ccc"
-        value={codigo}
-        onChangeText={setCodigo}
-        keyboardType="number-pad"
-        maxLength={8}
-        textAlign="center"
-      />
-
-      <TouchableOpacity
-        style={styles.boton}
-        onPress={verificarCodigo}
-        disabled={cargando}
-      >
-        {cargando ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.textoBoton}>Verificar</Text>
-        )}
+      {/* Flecha para volver y corregir el correo, si se equivocó */}
+      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={26} color="#fff" />
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={reenviarCodigo}>
-        <Text style={styles.reenviar}>¿No te llegó? Reenviar código</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.contenido}>
+        <Text style={styles.titulo}>Verifica tu correo</Text>
+        <Text style={styles.subtitulo}>
+          Te enviamos un código de 8 dígitos a{"\n"}
+          <Text style={{ fontWeight: "700" }}>{correo}</Text>
+        </Text>
+
+        <TextInput
+          style={styles.inputCodigo}
+          placeholder="00000000"
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={codigo}
+          onChangeText={setCodigo}
+          keyboardType="number-pad"
+          maxLength={8}
+          textAlign="center"
+        />
+
+        <TouchableOpacity
+          style={styles.boton}
+          onPress={verificarCodigo}
+          disabled={cargando}
+        >
+          {cargando ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.textoBoton}>Verificar</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={reenviarCodigo}>
+          <Text style={styles.reenviar}>¿No te llegó? Reenviar código</Text>
+        </TouchableOpacity>
+      </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  contenedor: {
-    flex: 1,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    padding: 28,
+  fondo: { flex: 1 },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(10, 10, 30, 0.45)",
   },
+  botonAtras: { position: "absolute", top: 55, left: 20, zIndex: 1 },
+  contenido: { flex: 1, justifyContent: "center", paddingHorizontal: 28 },
   titulo: {
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 10,
+    color: "#fff",
   },
   subtitulo: {
     fontSize: 14,
-    color: "#666",
+    color: "#EAEAEA",
     textAlign: "center",
     lineHeight: 20,
     marginBottom: 30,
@@ -153,11 +177,12 @@ const styles = StyleSheet.create({
   inputCodigo: {
     height: 60,
     borderWidth: 1.5,
-    borderColor: "#ccc",
+    borderColor: "rgba(255,255,255,0.5)",
     borderRadius: 12,
     fontSize: 24,
     letterSpacing: 8,
     marginBottom: 24,
+    color: "#fff",
   },
   boton: {
     height: 52,
@@ -168,5 +193,5 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   textoBoton: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  reenviar: { textAlign: "center", color: "#3B6FA0", fontWeight: "600" },
+  reenviar: { textAlign: "center", color: "#9DBEE0", fontWeight: "600" },
 });

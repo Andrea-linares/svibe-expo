@@ -1,6 +1,7 @@
 import { BotonTema } from "@/components/BotonTema";
 import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -670,62 +671,123 @@ export default function HomeScreen() {
       >
         <View style={styles.fondoOscuro}>
           <View
-            style={[
-              styles.panelMenu,
-              {
-                backgroundColor: colores.tarjeta,
-              },
-            ]}
+            style={[styles.panelMenu, { backgroundColor: colores.tarjeta }]}
           >
+            {/* Encabezado con logo y botón cerrar */}
             <View style={styles.cabeceraMenu}>
-              <Text
-                style={[
-                  styles.tituloMenu,
-                  {
-                    color: colores.texto,
-                  },
-                ]}
-              >
-                Menú
-              </Text>
-
-              <TouchableOpacity onPress={() => setMenuAbierto(false)}>
-                <Text
-                  style={[
-                    styles.cerrarMenu,
-                    {
-                      color: colores.texto,
-                    },
-                  ]}
-                >
-                  ✕
+              <View style={styles.filaLogoMenu}>
+                <View style={styles.circuloLogoMenu}>
+                  <Text style={styles.textoLogoMenu}>S</Text>
+                </View>
+                <Text style={[styles.tituloMenu, { color: colores.texto }]}>
+                  SVibe
                 </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setMenuAbierto(false)}
+                style={styles.botonCerrarMenu}
+              >
+                <Ionicons
+                  name="close"
+                  size={20}
+                  color={colores.textoSecundario}
+                />
               </TouchableOpacity>
             </View>
 
-            {OPCIONES_MENU.map((opcion) => (
-              <TouchableOpacity
-                key={opcion}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Sección: Tu actividad */}
+              <Text
                 style={[
-                  styles.itemMenu,
-                  {
-                    borderBottomColor: colores.borde,
-                  },
+                  styles.tituloSeccionMenu,
+                  { color: colores.textoSecundario },
                 ]}
-                onPress={() => seleccionarOpcionMenu(opcion)}
               >
-                <Text
-                  style={[
-                    styles.textoItemMenu,
-                    {
-                      color: colores.texto,
-                    },
-                  ]}
-                >
-                  {opcion}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                Tu actividad
+              </Text>
+              <ItemMenu
+                icono="heart-outline"
+                texto="Favoritos"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Favoritos")}
+              />
+              <ItemMenu
+                icono="download-outline"
+                texto="Descargas"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Descargas")}
+              />
+              <ItemMenu
+                icono="options-outline"
+                texto="Mis preferencias"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Mis preferencias")}
+              />
+
+              {/* Sección: Gamificación */}
+              <Text
+                style={[
+                  styles.tituloSeccionMenu,
+                  { color: colores.textoSecundario },
+                ]}
+              >
+                Logros y retos
+              </Text>
+              <ItemMenu
+                icono="trophy-outline"
+                texto="Logros"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Logros")}
+              />
+              <ItemMenu
+                icono="flag-outline"
+                texto="Retos"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Retos")}
+              />
+              <ItemMenu
+                icono="help-circle-outline"
+                texto="Quiz"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Quiz")}
+              />
+              <ItemMenu
+                icono="trending-up-outline"
+                texto="Niveles"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Niveles")}
+              />
+
+              {/* Sección: Comunidad */}
+              <Text
+                style={[
+                  styles.tituloSeccionMenu,
+                  { color: colores.textoSecundario },
+                ]}
+              >
+                Comunidad
+              </Text>
+              <ItemMenu
+                icono="chatbubbles-outline"
+                texto="Foro"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Foro")}
+              />
+              <ItemMenu
+                icono="bulb-outline"
+                texto="Sugerencias"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Sugerencias")}
+              />
+              <ItemMenu
+                icono="warning-outline"
+                texto="Reportar un problema"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Reportar un problema")}
+                esUltimo
+              />
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -947,41 +1009,6 @@ export default function HomeScreen() {
         </View>
       </Modal>
     </View>
-  );
-}
-
-function ItemMenu({
-  icono,
-  texto,
-  colores,
-  onPress,
-  esUltimo,
-}: {
-  icono: any;
-  texto: string;
-  colores: any;
-  onPress: () => void;
-  esUltimo?: boolean;
-}) {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.itemMenu,
-        { borderBottomColor: colores.borde },
-        esUltimo && { borderBottomWidth: 0 },
-      ]}
-      onPress={onPress}
-    >
-      <View
-        style={[styles.circuloIconoMenu, { backgroundColor: colores.fondo }]}
-      >
-        <Ionicons name={icono} size={18} color="#3B6FA0" />
-      </View>
-      <Text style={[styles.textoItemMenu, { color: colores.texto }]}>
-        {texto}
-      </Text>
-      <Ionicons name="chevron-forward" size={16} color="#C4C4C4" />
-    </TouchableOpacity>
   );
 }
 
@@ -1278,7 +1305,7 @@ const styles = StyleSheet.create({
   },
 
   panelMenu: {
-    width: "78%",
+    width: "80%",
     height: "100%",
     paddingTop: 60,
     paddingHorizontal: 20,
@@ -1287,26 +1314,50 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 24,
   },
-
-  tituloMenu: {
-    fontSize: 22,
-    fontWeight: "bold",
+  filaLogoMenu: { flexDirection: "row", alignItems: "center", gap: 10 },
+  circuloLogoMenu: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#3B6FA0",
+    justifyContent: "center",
+    alignItems: "center",
   },
-
-  cerrarMenu: {
-    fontSize: 22,
+  textoLogoMenu: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  tituloMenu: { fontSize: 20, fontWeight: "bold" },
+  botonCerrarMenu: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(150,150,150,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-
+  tituloSeccionMenu: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 18,
+    marginBottom: 8,
+  },
   itemMenu: {
-    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
     borderBottomWidth: 1,
+    gap: 12,
   },
-
-  textoItemMenu: {
-    fontSize: 16,
+  circuloIconoMenu: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
+  textoItemMenu: { flex: 1, fontSize: 15, fontWeight: "500" },
 
   panelFiltros: {
     borderTopLeftRadius: 20,

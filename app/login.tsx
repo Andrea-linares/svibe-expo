@@ -34,6 +34,28 @@ export default function LoginScreen() {
       "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
   });
 
+  // ---- Decide a dónde mandar según el rol del usuario que acaba de iniciar sesión ----
+  async function irSegunRol() {
+    const { data: sesion } = await supabase.auth.getUser();
+
+    if (!sesion?.user) {
+      router.replace("/(tabs)/home");
+      return;
+    }
+
+    const { data: perfilData } = await supabase
+      .from("perfiles")
+      .select("rol")
+      .eq("id", sesion.user.id)
+      .single();
+
+    if (perfilData?.rol === "administrador") {
+      router.replace("/admin/dashboard");
+    } else {
+      router.replace("/(tabs)/home");
+    }
+  }
+
   //  Efecto para manejar la respuesta cuando el usuario vuelve de Google
   useEffect(() => {
     if (response?.type === "success") {
@@ -56,8 +78,7 @@ export default function LoginScreen() {
           if (error) {
             Alert.alert("Error al iniciar sesión con Google", error.message);
           } else {
-            // Redirigir a la pantalla principal
-            router.replace("/(tabs)/home");
+            irSegunRol();
           }
         });
     }
@@ -88,7 +109,7 @@ export default function LoginScreen() {
       return;
     }
 
-    router.replace("/(tabs)/home");
+    await irSegunRol();
   }
 
   function continuarConRed(nombreRed: string) {

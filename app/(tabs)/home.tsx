@@ -1,6 +1,7 @@
 import { BotonTema } from "@/components/BotonTema";
 import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -77,8 +78,9 @@ export default function HomeScreen() {
   const [carrusel, setCarrusel] = useState<Hito[]>([]);
   const [imprescindibles, setImprescindibles] = useState<Hito[]>([]);
   const [preferidos, setPreferidos] = useState<Hito[]>([]);
-  const [resultadosBusqueda, setResultadosBusqueda] =
-    useState<Hito[] | null>(null);
+  const [resultadosBusqueda, setResultadosBusqueda] = useState<Hito[] | null>(
+    null,
+  );
 
   const [cargando, setCargando] = useState(true);
   const [buscando, setBuscando] = useState(false);
@@ -89,30 +91,27 @@ export default function HomeScreen() {
   const [busqueda, setBusqueda] = useState("");
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [categoriaFiltro, setCategoriaFiltro] =
-    useState<number | null>(null);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<number | null>(null);
 
   const [rangoFiltro, setRangoFiltro] = useState<
     (typeof RANGOS_PRECIO)[number] | null
   >(null);
 
-  const [categoriasPreferidas, setCategoriasPreferidas] =
-    useState<number[]>([]);
+  const [categoriasPreferidas, setCategoriasPreferidas] = useState<number[]>(
+    [],
+  );
 
-  const [usuarioAutenticado, setUsuarioAutenticado] =
-    useState(false);
+  const [usuarioAutenticado, setUsuarioAutenticado] = useState(false);
 
-  const [verificandoPreferencias, setVerificandoPreferencias] =
-    useState(true);
+  const [verificandoPreferencias, setVerificandoPreferencias] = useState(true);
 
-  const [mostrarOnboarding, setMostrarOnboarding] =
-    useState(false);
+  const [mostrarOnboarding, setMostrarOnboarding] = useState(false);
 
-  const [seleccionOnboarding, setSeleccionOnboarding] =
-    useState<Set<number>>(new Set());
+  const [seleccionOnboarding, setSeleccionOnboarding] = useState<Set<number>>(
+    new Set(),
+  );
 
-  const [guardandoOnboarding, setGuardandoOnboarding] =
-    useState(false);
+  const [guardandoOnboarding, setGuardandoOnboarding] = useState(false);
 
   const scrollCarruselRef = useRef<ScrollView>(null);
   const indiceCarruselRef = useRef(0);
@@ -120,8 +119,7 @@ export default function HomeScreen() {
 
   async function cargarPreferencias() {
     try {
-      const { data: sesion } =
-        await supabase.auth.getUser();
+      const { data: sesion } = await supabase.auth.getUser();
 
       if (!sesion?.user) {
         setUsuarioAutenticado(false);
@@ -136,9 +134,7 @@ export default function HomeScreen() {
         .select("categoria_id")
         .eq("usuario_id", sesion.user.id);
 
-      const ids = (preferencias ?? []).map(
-        (item) => item.categoria_id,
-      );
+      const ids = (preferencias ?? []).map((item) => item.categoria_id);
 
       setCategoriasPreferidas(ids);
 
@@ -148,17 +144,13 @@ export default function HomeScreen() {
         .eq("id", sesion.user.id)
         .maybeSingle();
 
-      const yaVioOnboarding =
-        perfilData?.onboarding_visto ?? false;
+      const yaVioOnboarding = perfilData?.onboarding_visto ?? false;
 
       if (ids.length === 0 && !yaVioOnboarding) {
         setMostrarOnboarding(true);
       }
     } catch (error) {
-      console.error(
-        "Error cargando preferencias:",
-        error,
-      );
+      console.error("Error cargando preferencias:", error);
 
       setUsuarioAutenticado(false);
       setCategoriasPreferidas([]);
@@ -182,8 +174,7 @@ export default function HomeScreen() {
   }
 
   async function guardarOnboardingPreferencias() {
-    const { data: sesion } =
-      await supabase.auth.getUser();
+    const { data: sesion } = await supabase.auth.getUser();
 
     if (!sesion?.user) {
       setMostrarOnboarding(false);
@@ -194,9 +185,7 @@ export default function HomeScreen() {
 
     try {
       if (seleccionOnboarding.size > 0) {
-        const filas = Array.from(
-          seleccionOnboarding,
-        ).map((categoria_id) => ({
+        const filas = Array.from(seleccionOnboarding).map((categoria_id) => ({
           usuario_id: sesion.user.id,
           categoria_id,
         }));
@@ -206,13 +195,9 @@ export default function HomeScreen() {
           .delete()
           .eq("usuario_id", sesion.user.id);
 
-        await supabase
-          .from("usuario_categorias")
-          .insert(filas);
+        await supabase.from("usuario_categorias").insert(filas);
 
-        setCategoriasPreferidas(
-          Array.from(seleccionOnboarding),
-        );
+        setCategoriasPreferidas(Array.from(seleccionOnboarding));
       }
 
       await supabase
@@ -224,18 +209,14 @@ export default function HomeScreen() {
 
       setMostrarOnboarding(false);
     } catch (error) {
-      console.error(
-        "Error guardando onboarding:",
-        error,
-      );
+      console.error("Error guardando onboarding:", error);
     } finally {
       setGuardandoOnboarding(false);
     }
   }
 
   async function omitirOnboarding() {
-    const { data: sesion } =
-      await supabase.auth.getUser();
+    const { data: sesion } = await supabase.auth.getUser();
 
     if (sesion?.user) {
       await supabase
@@ -264,10 +245,7 @@ export default function HomeScreen() {
 
           await cargarPreferencias();
         } catch (error) {
-          console.error(
-            "Error inicial Home:",
-            error,
-          );
+          console.error("Error inicial Home:", error);
         }
       }
 
@@ -299,30 +277,20 @@ export default function HomeScreen() {
           )
           .eq("es_lugar_oculto", false)
           .order("creado_en", {
-            ascending: true,
+            ascending: false,
           });
 
         if (error) {
-          console.error(
-            "Error cargando hitos:",
-            error,
-          );
+          console.error("Error cargando hitos:", error);
           return;
         }
 
         const hitos = (data ?? []) as Hito[];
-
         setImprescindibles(hitos.slice(0, 10));
-
         setCarrusel(hitos.slice(10, 14));
 
-        if (
-          usuarioAutenticado &&
-          categoriasPreferidas.length > 0
-        ) {
-          const {
-            data: dataPreferidos,
-          } = await supabase
+        if (usuarioAutenticado && categoriasPreferidas.length > 0) {
+          const { data: dataPreferidos } = await supabase
             .from("hitos")
             .select(
               `
@@ -336,37 +304,25 @@ export default function HomeScreen() {
               `,
             )
             .eq("es_lugar_oculto", false)
-            .in(
-              "categoria_id",
-              categoriasPreferidas,
-            )
+            .in("categoria_id", categoriasPreferidas)
             .order("creado_en", {
               ascending: true,
             })
             .limit(10);
 
-          setPreferidos(
-            (dataPreferidos ?? []) as Hito[],
-          );
+          setPreferidos((dataPreferidos ?? []) as Hito[]);
         } else {
           setPreferidos([]);
         }
       } catch (error) {
-        console.error(
-          "Error en cargarHitos:",
-          error,
-        );
+        console.error("Error en cargarHitos:", error);
       } finally {
         setCargando(false);
       }
     }
 
     cargarHitos();
-  }, [
-    usuarioAutenticado,
-    categoriasPreferidas,
-    verificandoPreferencias,
-  ]);
+  }, [usuarioAutenticado, categoriasPreferidas, verificandoPreferencias]);
 
   useEffect(() => {
     if (carrusel.length === 0) {
@@ -379,13 +335,10 @@ export default function HomeScreen() {
       }
 
       indiceCarruselRef.current =
-        (indiceCarruselRef.current + 1) %
-        carrusel.length;
+        (indiceCarruselRef.current + 1) % carrusel.length;
 
       scrollCarruselRef.current?.scrollTo({
-        x:
-          indiceCarruselRef.current *
-          ANCHO_TARJETA_CARRUSEL,
+        x: indiceCarruselRef.current * ANCHO_TARJETA_CARRUSEL,
         animated: true,
       });
     }, 3000);
@@ -442,10 +395,7 @@ export default function HomeScreen() {
         }
 
         if (categoriaFiltro !== null) {
-          query = query.eq(
-            "categoria_id",
-            categoriaFiltro,
-          );
+          query = query.eq("categoria_id", categoriaFiltro);
         }
 
         if (rangoFiltro !== null) {
@@ -454,21 +404,13 @@ export default function HomeScreen() {
             .lte("precio", rangoFiltro.max);
         }
 
-        const { data } = await query.order(
-          "nombre",
-          {
-            ascending: true,
-          },
-        );
+        const { data } = await query.order("nombre", {
+          ascending: true,
+        });
 
-        setResultadosBusqueda(
-          (data ?? []) as Hito[],
-        );
+        setResultadosBusqueda((data ?? []) as Hito[]);
       } catch (error) {
-        console.error(
-          "Error buscando:",
-          error,
-        );
+        console.error("Error buscando:", error);
 
         setResultadosBusqueda([]);
       } finally {
@@ -477,21 +419,14 @@ export default function HomeScreen() {
     }, 400);
 
     return () => clearTimeout(timeout);
-  }, [
-    busqueda,
-    categoriaFiltro,
-    rangoFiltro,
-    hayFiltrosActivos,
-  ]);
+  }, [busqueda, categoriaFiltro, rangoFiltro, hayFiltrosActivos]);
 
   function limpiarFiltros() {
     setCategoriaFiltro(null);
     setRangoFiltro(null);
   }
 
-  function seleccionarOpcionMenu(
-    opcion: string,
-  ) {
+  function seleccionarOpcionMenu(opcion: string) {
     setMenuAbierto(false);
 
     if (opcion === "Quiz") {
@@ -519,9 +454,7 @@ export default function HomeScreen() {
       return;
     }
 
-    console.log(
-      `Opción seleccionada: ${opcion}`,
-    );
+    console.log(`Opción seleccionada: ${opcion}`);
   }
 
   return (
@@ -537,15 +470,12 @@ export default function HomeScreen() {
         style={[
           styles.encabezado,
           {
-            backgroundColor:
-              colores.encabezado,
+            backgroundColor: colores.encabezado,
           },
         ]}
       >
         <TouchableOpacity
-          onPress={() =>
-            setMenuAbierto(true)
-          }
+          onPress={() => setMenuAbierto(true)}
           style={styles.botonIcono}
         >
           <Text
@@ -566,44 +496,31 @@ export default function HomeScreen() {
           style={[
             styles.inputBusqueda,
             {
-              backgroundColor:
-                colores.tarjeta,
+              backgroundColor: colores.tarjeta,
               color: colores.texto,
             },
           ]}
           placeholder="Buscar por nombre, lugar o precio..."
-          placeholderTextColor={
-            colores.textoSecundario
-          }
+          placeholderTextColor={colores.textoSecundario}
           value={busqueda}
           onChangeText={setBusqueda}
         />
 
         <TouchableOpacity
-          onPress={() =>
-            setFiltrosAbiertos(true)
-          }
+          onPress={() => setFiltrosAbiertos(true)}
           style={styles.botonIcono}
         >
-          <Text style={styles.icono}>
-            ⚙️
-          </Text>
+          <Text style={styles.icono}>⚙️</Text>
 
-          {(categoriaFiltro !== null ||
-            rangoFiltro !== null) && (
-            <View
-              style={styles.puntoActivo}
-            />
+          {(categoriaFiltro !== null || rangoFiltro !== null) && (
+            <View style={styles.puntoActivo} />
           )}
         </TouchableOpacity>
       </View>
 
       {cargando ? (
         <View style={styles.centrado}>
-          <ActivityIndicator
-            size="large"
-            color="#3B6FA0"
-          />
+          <ActivityIndicator size="large" color="#3B6FA0" />
         </View>
       ) : hayFiltrosActivos ? (
         <ScrollView
@@ -612,11 +529,7 @@ export default function HomeScreen() {
             paddingBottom: 40,
           }}
         >
-          <View
-            style={
-              styles.encabezadoResultados
-            }
-          >
+          <View style={styles.encabezadoResultados}>
             <Text
               style={[
                 styles.tituloSeccion,
@@ -636,39 +549,28 @@ export default function HomeScreen() {
                 limpiarFiltros();
               }}
             >
-              <Text style={styles.limpiar}>
-                Limpiar
-              </Text>
+              <Text style={styles.limpiar}>Limpiar</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.grid}>
-            {(resultadosBusqueda ?? []).map(
-              (hito) => (
-                <TarjetaGrid
-                  key={hito.id}
-                  hito={hito}
-                />
-              ),
-            )}
+            {(resultadosBusqueda ?? []).map((hito) => (
+              <TarjetaGrid key={hito.id} hito={hito} />
+            ))}
           </View>
 
-          {resultadosBusqueda?.length ===
-            0 &&
-            !buscando && (
-              <Text
-                style={[
-                  styles.sinResultados,
-                  {
-                    color:
-                      colores.textoSecundario,
-                  },
-                ]}
-              >
-                No se encontraron lugares
-                con esos criterios.
-              </Text>
-            )}
+          {resultadosBusqueda?.length === 0 && !buscando && (
+            <Text
+              style={[
+                styles.sinResultados,
+                {
+                  color: colores.textoSecundario,
+                },
+              ]}
+            >
+              No se encontraron lugares con esos criterios.
+            </Text>
+          )}
         </ScrollView>
       ) : (
         <ScrollView
@@ -691,42 +593,24 @@ export default function HomeScreen() {
           <ScrollView
             ref={scrollCarruselRef}
             horizontal
-            showsHorizontalScrollIndicator={
-              false
-            }
+            showsHorizontalScrollIndicator={false}
             style={styles.carrusel}
-            onTouchStart={
-              pausarCarrusel
-            }
-            onScrollEndDrag={
-              reanudarCarruselConRetraso
-            }
-            onMomentumScrollEnd={(
-              evento,
-            ) => {
-              indiceCarruselRef.current =
-                Math.round(
-                  evento.nativeEvent
-                    .contentOffset.x /
-                    ANCHO_TARJETA_CARRUSEL,
-                );
+            onTouchStart={pausarCarrusel}
+            onScrollEndDrag={reanudarCarruselConRetraso}
+            onMomentumScrollEnd={(evento) => {
+              indiceCarruselRef.current = Math.round(
+                evento.nativeEvent.contentOffset.x / ANCHO_TARJETA_CARRUSEL,
+              );
             }}
           >
             {carrusel.map((hito) => (
-              <TarjetaCarrusel
-                key={hito.id}
-                hito={hito}
-              />
+              <TarjetaCarrusel key={hito.id} hito={hito} />
             ))}
           </ScrollView>
 
           {preferidos.length > 0 && (
             <>
-              <View
-                style={
-                  styles.encabezadoPreferencias
-                }
-              >
+              <View style={styles.encabezadoPreferencias}>
                 <Text
                   style={[
                     styles.tituloSeccion,
@@ -741,33 +625,18 @@ export default function HomeScreen() {
                   Tus preferencias
                 </Text>
 
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push(
-                      "/preferencias",
-                    )
-                  }
-                >
-                  <Text
-                    style={styles.verTodas}
-                  >
-                    Ver todas
-                  </Text>
+                <TouchableOpacity onPress={() => router.push("/preferencias")}>
+                  <Text style={styles.verTodas}>Ver todas</Text>
                 </TouchableOpacity>
               </View>
 
               <ScrollView
                 horizontal
-                showsHorizontalScrollIndicator={
-                  false
-                }
+                showsHorizontalScrollIndicator={false}
                 style={styles.carrusel}
               >
                 {preferidos.map((hito) => (
-                  <TarjetaCarrusel
-                    key={hito.id}
-                    hito={hito}
-                  />
+                  <TarjetaCarrusel key={hito.id} hito={hito} />
                 ))}
               </ScrollView>
             </>
@@ -786,10 +655,7 @@ export default function HomeScreen() {
 
           <View style={styles.grid}>
             {imprescindibles.map((hito) => (
-              <TarjetaGrid
-                key={hito.id}
-                hito={hito}
-              />
+              <TarjetaGrid key={hito.id} hito={hito} />
             ))}
           </View>
         </ScrollView>
@@ -801,83 +667,127 @@ export default function HomeScreen() {
         visible={menuAbierto}
         animationType="slide"
         transparent
-        onRequestClose={() =>
-          setMenuAbierto(false)
-        }
+        onRequestClose={() => setMenuAbierto(false)}
       >
         <View style={styles.fondoOscuro}>
           <View
-            style={[
-              styles.panelMenu,
-              {
-                backgroundColor:
-                  colores.tarjeta,
-              },
-            ]}
+            style={[styles.panelMenu, { backgroundColor: colores.tarjeta }]}
           >
-            <View
-              style={styles.cabeceraMenu}
-            >
-              <Text
-                style={[
-                  styles.tituloMenu,
-                  {
-                    color: colores.texto,
-                  },
-                ]}
-              >
-                Menú
-              </Text>
+            {/* Encabezado con logo y botón cerrar */}
+            <View style={styles.cabeceraMenu}>
+              <View style={styles.filaLogoMenu}>
+                <View style={styles.circuloLogoMenu}>
+                  <Text style={styles.textoLogoMenu}>S</Text>
+                </View>
+                <Text style={[styles.tituloMenu, { color: colores.texto }]}>
+                  SVibe
+                </Text>
+              </View>
 
               <TouchableOpacity
-                onPress={() =>
-                  setMenuAbierto(false)
-                }
+                onPress={() => setMenuAbierto(false)}
+                style={styles.botonCerrarMenu}
               >
-                <Text
-                  style={[
-                    styles.cerrarMenu,
-                    {
-                      color: colores.texto,
-                    },
-                  ]}
-                >
-                  ✕
-                </Text>
+                <Ionicons
+                  name="close"
+                  size={20}
+                  color={colores.textoSecundario}
+                />
               </TouchableOpacity>
             </View>
 
-            {OPCIONES_MENU.map(
-              (opcion) => (
-                <TouchableOpacity
-                  key={opcion}
-                  style={[
-                    styles.itemMenu,
-                    {
-                      borderBottomColor:
-                        colores.borde,
-                    },
-                  ]}
-                  onPress={() =>
-                    seleccionarOpcionMenu(
-                      opcion,
-                    )
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.textoItemMenu,
-                      {
-                        color:
-                          colores.texto,
-                      },
-                    ]}
-                  >
-                    {opcion}
-                  </Text>
-                </TouchableOpacity>
-              ),
-            )}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Sección: Tu actividad */}
+              <Text
+                style={[
+                  styles.tituloSeccionMenu,
+                  { color: colores.textoSecundario },
+                ]}
+              >
+                Tu actividad
+              </Text>
+              <ItemMenu
+                icono="heart-outline"
+                texto="Favoritos"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Favoritos")}
+              />
+              <ItemMenu
+                icono="download-outline"
+                texto="Descargas"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Descargas")}
+              />
+              <ItemMenu
+                icono="options-outline"
+                texto="Mis preferencias"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Mis preferencias")}
+              />
+
+              {/* Sección: Gamificación */}
+              <Text
+                style={[
+                  styles.tituloSeccionMenu,
+                  { color: colores.textoSecundario },
+                ]}
+              >
+                Logros y retos
+              </Text>
+              <ItemMenu
+                icono="trophy-outline"
+                texto="Logros"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Logros")}
+              />
+              <ItemMenu
+                icono="flag-outline"
+                texto="Retos"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Retos")}
+              />
+              <ItemMenu
+                icono="help-circle-outline"
+                texto="Quiz"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Quiz")}
+              />
+              <ItemMenu
+                icono="trending-up-outline"
+                texto="Niveles"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Niveles")}
+              />
+
+              {/* Sección: Comunidad */}
+              <Text
+                style={[
+                  styles.tituloSeccionMenu,
+                  { color: colores.textoSecundario },
+                ]}
+              >
+                Comunidad
+              </Text>
+              <ItemMenu
+                icono="chatbubbles-outline"
+                texto="Foro"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Foro")}
+              />
+              <ItemMenu
+                icono="bulb-outline"
+                texto="Sugerencias"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Sugerencias")}
+              />
+              <ItemMenu
+                icono="warning-outline"
+                texto="Reportar un problema"
+                colores={colores}
+                onPress={() => seleccionarOpcionMenu("Reportar un problema")}
+                esUltimo
+              />
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -888,21 +798,14 @@ export default function HomeScreen() {
         visible={filtrosAbiertos}
         animationType="slide"
         transparent
-        onRequestClose={() =>
-          setFiltrosAbiertos(false)
-        }
+        onRequestClose={() => setFiltrosAbiertos(false)}
       >
-        <View
-          style={
-            styles.fondoOscuroCentrado
-          }
-        >
+        <View style={styles.fondoOscuroCentrado}>
           <View
             style={[
               styles.panelFiltros,
               {
-                backgroundColor:
-                  colores.tarjeta,
+                backgroundColor: colores.tarjeta,
               },
             ]}
           >
@@ -929,45 +832,30 @@ export default function HomeScreen() {
             </Text>
 
             <View style={styles.chips}>
-              {RANGOS_PRECIO.map(
-                (rango) => {
-                  const activo =
-                    rangoFiltro?.etiqueta ===
-                    rango.etiqueta;
+              {RANGOS_PRECIO.map((rango) => {
+                const activo = rangoFiltro?.etiqueta === rango.etiqueta;
 
-                  return (
-                    <TouchableOpacity
-                      key={rango.etiqueta}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor:
-                            activo
-                              ? "#3B6FA0"
-                              : colores.fondo,
-                        },
-                      ]}
-                      onPress={() =>
-                        setRangoFiltro(
-                          activo
-                            ? null
-                            : rango,
-                        )
-                      }
+                return (
+                  <TouchableOpacity
+                    key={rango.etiqueta}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: activo ? "#3B6FA0" : colores.fondo,
+                      },
+                    ]}
+                    onPress={() => setRangoFiltro(activo ? null : rango)}
+                  >
+                    <Text
+                      style={{
+                        color: activo ? "#fff" : colores.texto,
+                      }}
                     >
-                      <Text
-                        style={{
-                          color: activo
-                            ? "#fff"
-                            : colores.texto,
-                        }}
-                      >
-                        {rango.etiqueta}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                },
-              )}
+                      {rango.etiqueta}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <Text
@@ -983,9 +871,7 @@ export default function HomeScreen() {
 
             <View style={styles.chips}>
               {categorias.map((cat) => {
-                const activo =
-                  categoriaFiltro ===
-                  cat.id;
+                const activo = categoriaFiltro === cat.id;
 
                 return (
                   <TouchableOpacity
@@ -993,25 +879,14 @@ export default function HomeScreen() {
                     style={[
                       styles.chip,
                       {
-                        backgroundColor:
-                          activo
-                            ? "#3B6FA0"
-                            : colores.fondo,
+                        backgroundColor: activo ? "#3B6FA0" : colores.fondo,
                       },
                     ]}
-                    onPress={() =>
-                      setCategoriaFiltro(
-                        activo
-                          ? null
-                          : cat.id,
-                      )
-                    }
+                    onPress={() => setCategoriaFiltro(activo ? null : cat.id)}
                   >
                     <Text
                       style={{
-                        color: activo
-                          ? "#fff"
-                          : colores.texto,
+                        color: activo ? "#fff" : colores.texto,
                       }}
                     >
                       {cat.nombre}
@@ -1021,21 +896,16 @@ export default function HomeScreen() {
               })}
             </View>
 
-            <View
-              style={styles.botonesFiltro}
-            >
+            <View style={styles.botonesFiltro}>
               <TouchableOpacity
-                style={
-                  styles.botonLimpiarFiltro
-                }
+                style={styles.botonLimpiarFiltro}
                 onPress={limpiarFiltros}
               >
                 <Text
                   style={[
                     styles.textoBotonLimpiar,
                     {
-                      color:
-                        colores.texto,
+                      color: colores.texto,
                     },
                   ]}
                 >
@@ -1044,22 +914,10 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={
-                  styles.botonAplicarFiltro
-                }
-                onPress={() =>
-                  setFiltrosAbiertos(
-                    false,
-                  )
-                }
+                style={styles.botonAplicarFiltro}
+                onPress={() => setFiltrosAbiertos(false)}
               >
-                <Text
-                  style={
-                    styles.textoBotonAplicar
-                  }
-                >
-                  Aplicar
-                </Text>
+                <Text style={styles.textoBotonAplicar}>Aplicar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1068,30 +926,17 @@ export default function HomeScreen() {
 
       {/* ONBOARDING */}
 
-      <Modal
-        visible={mostrarOnboarding}
-        animationType="fade"
-        transparent
-      >
-        <View
-          style={
-            styles.fondoOscuroCentrado
-          }
-        >
+      <Modal visible={mostrarOnboarding} animationType="fade" transparent>
+        <View style={styles.fondoOscuroCentrado}>
           <View
             style={[
               styles.panelOnboarding,
               {
-                backgroundColor:
-                  colores.tarjeta,
+                backgroundColor: colores.tarjeta,
               },
             ]}
           >
-            <Text
-              style={styles.iconoOnboarding}
-            >
-              🏛️
-            </Text>
+            <Text style={styles.iconoOnboarding}>🏛️</Text>
 
             <Text
               style={[
@@ -1108,26 +953,17 @@ export default function HomeScreen() {
               style={[
                 styles.subtituloOnboarding,
                 {
-                  color:
-                    colores.textoSecundario,
+                  color: colores.textoSecundario,
                 },
               ]}
             >
-              Elige los temas que más te
-              interesan para mostrarte
-              mejores recomendaciones.
+              Elige los temas que más te interesan para mostrarte mejores
+              recomendaciones.
             </Text>
 
-            <View
-              style={
-                styles.chipsOnboarding
-              }
-            >
+            <View style={styles.chipsOnboarding}>
               {categorias.map((cat) => {
-                const activa =
-                  seleccionOnboarding.has(
-                    cat.id,
-                  );
+                const activa = seleccionOnboarding.has(cat.id);
 
                 return (
                   <TouchableOpacity
@@ -1135,23 +971,14 @@ export default function HomeScreen() {
                     style={[
                       styles.chipOnboarding,
                       {
-                        backgroundColor:
-                          activa
-                            ? "#3B6FA0"
-                            : colores.fondo,
+                        backgroundColor: activa ? "#3B6FA0" : colores.fondo,
                       },
                     ]}
-                    onPress={() =>
-                      toggleCategoriaOnboarding(
-                        cat.id,
-                      )
-                    }
+                    onPress={() => toggleCategoriaOnboarding(cat.id)}
                   >
                     <Text
                       style={{
-                        color: activa
-                          ? "#fff"
-                          : colores.texto,
+                        color: activa ? "#fff" : colores.texto,
                       }}
                     >
                       {cat.nombre}
@@ -1162,39 +989,21 @@ export default function HomeScreen() {
             </View>
 
             <TouchableOpacity
-              style={
-                styles.botonGuardarOnboarding
-              }
-              onPress={
-                guardarOnboardingPreferencias
-              }
-              disabled={
-                guardandoOnboarding
-              }
+              style={styles.botonGuardarOnboarding}
+              onPress={guardarOnboardingPreferencias}
+              disabled={guardandoOnboarding}
             >
               {guardandoOnboarding ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text
-                  style={
-                    styles.textoBotonGuardarOnboarding
-                  }
-                >
+                <Text style={styles.textoBotonGuardarOnboarding}>
                   Guardar preferencias
                 </Text>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={omitirOnboarding}
-            >
-              <Text
-                style={
-                  styles.textoOmitirOnboarding
-                }
-              >
-                Ahora no
-              </Text>
+            <TouchableOpacity onPress={omitirOnboarding}>
+              <Text style={styles.textoOmitirOnboarding}>Ahora no</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1203,18 +1012,9 @@ export default function HomeScreen() {
   );
 }
 
-function obtenerImagenPrincipal(
-  hito: Hito,
-) {
-  if (
-    hito.hito_imagenes &&
-    hito.hito_imagenes.length > 0
-  ) {
-    const ordenadas = [
-      ...hito.hito_imagenes,
-    ].sort(
-      (a, b) => a.orden - b.orden,
-    );
+function obtenerImagenPrincipal(hito: Hito) {
+  if (hito.hito_imagenes && hito.hito_imagenes.length > 0) {
+    const ordenadas = [...hito.hito_imagenes].sort((a, b) => a.orden - b.orden);
 
     return {
       uri: ordenadas[0].url,
@@ -1224,11 +1024,7 @@ function obtenerImagenPrincipal(
   return require("@/assets/images/partial-react-logo.png");
 }
 
-function TarjetaCarrusel({
-  hito,
-}: {
-  hito: Hito;
-}) {
+function TarjetaCarrusel({ hito }: { hito: Hito }) {
   const { colores } = useTema();
 
   return (
@@ -1236,18 +1032,13 @@ function TarjetaCarrusel({
       style={[
         styles.cardCarrusel,
         {
-          backgroundColor:
-            colores.tarjeta,
+          backgroundColor: colores.tarjeta,
         },
       ]}
-      onPress={() =>
-        router.push(`/hito/${hito.id}`)
-      }
+      onPress={() => router.push(`/hito/${hito.id}`)}
     >
       <Image
-        source={obtenerImagenPrincipal(
-          hito,
-        )}
+        source={obtenerImagenPrincipal(hito)}
         style={styles.imagenCarrusel}
       />
 
@@ -1265,12 +1056,42 @@ function TarjetaCarrusel({
     </TouchableOpacity>
   );
 }
-
-function TarjetaGrid({
-  hito,
+function ItemMenu({
+  icono,
+  texto,
+  colores,
+  onPress,
+  esUltimo,
 }: {
-  hito: Hito;
+  icono: any;
+  texto: string;
+  colores: any;
+  onPress: () => void;
+  esUltimo?: boolean;
 }) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.itemMenu,
+        { borderBottomColor: colores.borde },
+        esUltimo && { borderBottomWidth: 0 },
+      ]}
+      onPress={onPress}
+    >
+      <View
+        style={[styles.circuloIconoMenu, { backgroundColor: colores.fondo }]}
+      >
+        <Ionicons name={icono} size={18} color="#3B6FA0" />
+      </View>
+      <Text style={[styles.textoItemMenu, { color: colores.texto }]}>
+        {texto}
+      </Text>
+      <Ionicons name="chevron-forward" size={16} color="#C4C4C4" />
+    </TouchableOpacity>
+  );
+}
+
+function TarjetaGrid({ hito }: { hito: Hito }) {
   const { colores } = useTema();
 
   return (
@@ -1278,20 +1099,12 @@ function TarjetaGrid({
       style={[
         styles.cardGrid,
         {
-          backgroundColor:
-            colores.tarjeta,
+          backgroundColor: colores.tarjeta,
         },
       ]}
-      onPress={() =>
-        router.push(`/hito/${hito.id}`)
-      }
+      onPress={() => router.push(`/hito/${hito.id}`)}
     >
-      <Image
-        source={obtenerImagenPrincipal(
-          hito,
-        )}
-        style={styles.imagenGrid}
-      />
+      <Image source={obtenerImagenPrincipal(hito)} style={styles.imagenGrid} />
 
       <Text
         style={[
@@ -1310,8 +1123,7 @@ function TarjetaGrid({
           style={[
             styles.ubicacionGrid,
             {
-              color:
-                colores.textoSecundario,
+              color: colores.textoSecundario,
             },
           ]}
           numberOfLines={1}
@@ -1321,11 +1133,8 @@ function TarjetaGrid({
       )}
 
       <Text style={styles.precioGrid}>
-        {hito.precio &&
-        hito.precio > 0
-          ? `Desde $${hito.precio.toFixed(
-              2,
-            )}`
+        {hito.precio && hito.precio > 0
+          ? `Desde $${hito.precio.toFixed(2)}`
           : "Gratis"}
       </Text>
     </TouchableOpacity>
@@ -1496,36 +1305,59 @@ const styles = StyleSheet.create({
   },
 
   panelMenu: {
-    width: "78%",
+    width: "80%",
     height: "100%",
     paddingTop: 60,
     paddingHorizontal: 20,
   },
-
   cabeceraMenu: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 24,
   },
-
-  tituloMenu: {
-    fontSize: 22,
-    fontWeight: "bold",
+  filaLogoMenu: { flexDirection: "row", alignItems: "center", gap: 10 },
+  circuloLogoMenu: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#3B6FA0",
+    justifyContent: "center",
+    alignItems: "center",
   },
-
-  cerrarMenu: {
-    fontSize: 22,
+  textoLogoMenu: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  tituloMenu: { fontSize: 20, fontWeight: "bold" },
+  botonCerrarMenu: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(150,150,150,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-
+  tituloSeccionMenu: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 18,
+    marginBottom: 8,
+  },
   itemMenu: {
-    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
     borderBottomWidth: 1,
+    gap: 12,
   },
-
-  textoItemMenu: {
-    fontSize: 16,
+  circuloIconoMenu: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
+  textoItemMenu: { flex: 1, fontSize: 15, fontWeight: "500" },
 
   panelFiltros: {
     borderTopLeftRadius: 20,

@@ -15,13 +15,23 @@ import {
 export default function BienvenidaScreen() {
   const [verificando, setVerificando] = useState(true);
   const [tienePreferencias, setTienePreferencias] = useState(false);
+  const [esAdmin, setEsAdmin] = useState(false);
 
- useEffect(() => {
+  useEffect(() => {
     async function verificarPreferencias() {
       try {
         const { data: sesion } = await supabase.auth.getUser();
 
         if (sesion?.user) {
+          // Verificar si es administrador
+          const { data: perfilData } = await supabase
+            .from("perfiles")
+            .select("rol")
+            .eq("id", sesion.user.id)
+            .single();
+
+          setEsAdmin(perfilData?.rol === "administrador");
+
           // Verificar si tiene categorías seleccionadas
           const { count } = await supabase
             .from("usuario_categorias")
@@ -34,13 +44,15 @@ export default function BienvenidaScreen() {
             (count ?? 0) > 0,
             "(",
             count,
-            ")"
+            ")",
           );
         } else {
+          setEsAdmin(false);
           setTienePreferencias(false);
         }
       } catch (error) {
         console.error(" Error verificando preferencias:", error);
+        setEsAdmin(false);
         setTienePreferencias(false);
       } finally {
         setVerificando(false);
@@ -49,15 +61,17 @@ export default function BienvenidaScreen() {
 
     verificarPreferencias();
   }, []);
-  
+
   useEffect(() => {
     if (!verificando) {
-      if (tienePreferencias) {
+      if (esAdmin) {
+        router.replace("/admin/dashboard");
+      } else if (tienePreferencias) {
         router.replace("/(tabs)/home");
       }
     }
-  }, [verificando, tienePreferencias]);
-  
+  }, [verificando, esAdmin, tienePreferencias]);
+
   if (verificando) {
     return (
       <View style={styles.centrado}>
@@ -117,7 +131,7 @@ export default function BienvenidaScreen() {
 
 const styles = StyleSheet.create({
   fondo: { flex: 1 },
-   centrado: {
+  centrado: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",

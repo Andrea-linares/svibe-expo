@@ -21,6 +21,12 @@ export default function RootLayout() {
     <TemaProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack>
+          <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
+
+          <Stack.Screen
+            name="admin/hito-formulario"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen name="registro" options={{ headerShown: false }} />
           <Stack.Screen
             name="verificar-codigo"

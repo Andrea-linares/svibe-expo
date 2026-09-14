@@ -45,62 +45,68 @@ export default function PerfilScreen() {
 
   useFocusEffect(
     useCallback(() => {
-    async function cargarPerfil() {
-      const { data: sesion } = await supabase.auth.getUser();
+      async function cargarPerfil() {
+        const { data: sesion } = await supabase.auth.getUser();
 
-      if (!sesion?.user) {
-        setUsuarioId(null);
+        if (!sesion?.user) {
+          setUsuarioId(null);
+          setCargando(false);
+          return;
+        }
+
+        const userId = sesion.user.id;
+        setUsuarioId(userId);
+
+        // Datos del perfil
+        const { data: perfilData } = await supabase
+          .from("perfiles")
+          .select("nombre, apellido, ciudad, foto_perfil_url, rol")
+          .eq("id", userId)
+          .single();
+
+        // Hitos visitados (distintos)
+        const { data: visitas } = await supabase
+          .from("interacciones_usuario")
+          .select("hito_id")
+          .eq("usuario_id", userId)
+          .eq("tipo_interaccion", "visita");
+
+        const hitosUnicos = new Set((visitas ?? []).map((v) => v.hito_id));
+
+        // Hitos favoritos
+        const { count: favoritosCount } = await supabase
+          .from("favoritos")
+          .select("*", { count: "exact", head: true })
+          .eq("usuario_id", userId);
+
+        // Rutas guardadas
+        const { data: rutasData } = await supabase
+          .from("rutas")
+          .select("id, nombre")
+          .eq("usuario_id", userId)
+          .order("creada_en", { ascending: false });
+
+        // Logros obtenidos
+        const { data: logrosData } = await supabase
+          .from("usuario_insignias")
+          .select("insignia_id, insignias(nombre, descripcion, icono)")
+          .eq("usuario_id", userId);
+
+        setPerfil(perfilData);
+
+        if (perfilData?.rol === "administrador") {
+          router.replace("/admin/dashboard");
+          return;
+        }
+
+        setTotalVisitados(hitosUnicos.size);
+        setTotalFavoritos(favoritosCount ?? 0);
+        setRutas(rutasData ?? []);
+        setLogros((logrosData as unknown as Logro[]) ?? []);
         setCargando(false);
-        return;
       }
 
-      const userId = sesion.user.id;
-      setUsuarioId(userId);
-
-      // Datos del perfil
-      const { data: perfilData } = await supabase
-        .from("perfiles")
-        .select("nombre, apellido, ciudad, foto_perfil_url")
-        .eq("id", userId)
-        .single();
-
-      // Hitos visitados (distintos)
-      const { data: visitas } = await supabase
-        .from("interacciones_usuario")
-        .select("hito_id")
-        .eq("usuario_id", userId)
-        .eq("tipo_interaccion", "visita");
-
-      const hitosUnicos = new Set((visitas ?? []).map((v) => v.hito_id));
-
-      // Hitos favoritos
-      const { count: favoritosCount } = await supabase
-        .from("favoritos")
-        .select("*", { count: "exact", head: true })
-        .eq("usuario_id", userId);
-
-      // Rutas guardadas
-      const { data: rutasData } = await supabase
-        .from("rutas")
-        .select("id, nombre")
-        .eq("usuario_id", userId)
-        .order("creada_en", { ascending: false });
-
-      // Logros obtenidos
-      const { data: logrosData } = await supabase
-        .from("usuario_insignias")
-        .select("insignia_id, insignias(nombre, descripcion, icono)")
-        .eq("usuario_id", userId);
-
-      setPerfil(perfilData);
-      setTotalVisitados(hitosUnicos.size);
-      setTotalFavoritos(favoritosCount ?? 0);
-      setRutas(rutasData ?? []);
-      setLogros((logrosData as unknown as Logro[]) ?? []);
-      setCargando(false);
-    }
-
-    cargarPerfil();
+      cargarPerfil();
     }, []),
   );
 
@@ -123,8 +129,7 @@ export default function PerfilScreen() {
       <View style={styles.centrado}>
         <Text style={styles.tituloInvitado}>Estás como invitado</Text>
         <Text style={styles.textoInvitado}>
-          Inicia sesión para ver tu perfil, tus favoritos y tus rutas
-          guardadas.
+          Inicia sesión para ver tu perfil, tus favoritos y tus rutas guardadas.
         </Text>
         <TouchableOpacity
           style={styles.botonIniciarSesion}
@@ -136,25 +141,27 @@ export default function PerfilScreen() {
     );
   }
 
-   const nombreCompleto = perfil?.nombre?.trim()
+  const nombreCompleto = perfil?.nombre?.trim()
     ? `${perfil.nombre}${perfil.apellido ? ` ${perfil.apellido}` : ""}`
     : "Usuario";
 
   return (
-    <ScrollView style={styles.contenedor}
-    contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView
+      style={styles.contenedor}
+      contentContainerStyle={{ paddingBottom: 40 }}
+    >
       {/* Encabezado con avatar, nombre y ciudad */}
       <View style={styles.tarjetaEncabezado}>
         <View style={styles.filaEncabezado}>
           <Image
-          source={
-            perfil?.foto_perfil_url
-              ? { uri: perfil.foto_perfil_url }
-              : require("@/assets/images/partial-react-logo.png")
-          }
-          style={styles.avatar}
-        />
-        <View style={styles.infoEncabezado}>
+            source={
+              perfil?.foto_perfil_url
+                ? { uri: perfil.foto_perfil_url }
+                : require("@/assets/images/partial-react-logo.png")
+            }
+            style={styles.avatar}
+          />
+          <View style={styles.infoEncabezado}>
             <Text style={styles.nombre} numberOfLines={1}>
               {nombreCompleto}
             </Text>
@@ -170,13 +177,13 @@ export default function PerfilScreen() {
         <TouchableOpacity
           style={styles.botonEditarPerfil}
           onPress={() => router.push("/editar-perfil")}
-          >
+        >
           <Ionicons name="pencil-outline" size={14} color="#fff" />
           <Text style={styles.textoBotonEditarPerfil}>Editar perfil</Text>
         </TouchableOpacity>
       </View>
 
-       {/* Estadísticas: 2x2 */}
+      {/* Estadísticas: 2x2 */}
       <View style={styles.gridEstadisticas}>
         <View style={styles.tarjetaEstadistica}>
           <View style={[styles.circuloIcono, { backgroundColor: "#E3EEF8" }]}>
@@ -256,15 +263,25 @@ export default function PerfilScreen() {
           <Ionicons name="chevron-forward" size={20} color="#C4C4C4" />
         </TouchableOpacity>
 
-      {/* Cerrar Sesión */}
-      <TouchableOpacity
-        style={styles.botonCerrarSesion}
-        activeOpacity={0.75}
-        onPress={cerrarSesion}
-      >
-        <Ionicons name="log-out-outline" size={18} color="#D32F2F" />
-        <Text style={styles.textoBotonCerrarSesion}>Cerrar Sesión</Text>
-      </TouchableOpacity>
+        {/* Cerrar Sesión */}
+        <TouchableOpacity
+          style={styles.botonCerrarSesion}
+          activeOpacity={0.75}
+          onPress={cerrarSesion}
+        >
+          <Ionicons name="log-out-outline" size={18} color="#D32F2F" />
+          <Text style={styles.textoBotonCerrarSesion}>Cerrar Sesión</Text>
+        </TouchableOpacity>
+        {perfil?.rol === "administrador" && (
+          <TouchableOpacity
+            style={[styles.tarjetaLista, { marginTop: 18, padding: 16 }]}
+            onPress={() => router.push("/admin/hitos")}
+          >
+            <Text style={{ fontWeight: "600", color: "#3B6FA0" }}>
+              🛠️ Panel de administrador
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );

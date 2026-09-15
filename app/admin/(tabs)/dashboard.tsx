@@ -6,6 +6,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -59,7 +60,10 @@ export default function AdminDashboardScreen() {
     <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
       <AdminHeader titulo="Hola, Admin" subtitulo="Resumen general de la app" />
 
-      <View style={styles.cuerpo}>
+      <ScrollView
+        style={styles.cuerpo}
+        contentContainerStyle={{ paddingBottom: 30 }}
+      >
         <View style={styles.grid}>
           <TarjetaResumen
             icono="people"
@@ -112,6 +116,15 @@ export default function AdminDashboardScreen() {
           <Ionicons name="chevron-forward" size={20} color="#C4C4C4" />
         </TouchableOpacity>
 
+        {/* Ver como usuario — arriba de Cerrar sesión */}
+        <TouchableOpacity
+          style={styles.botonVerUsuario}
+          onPress={() => router.push("/(tabs)/home")}
+        >
+          <Ionicons name="eye-outline" size={18} color="#fff" />
+          <Text style={styles.textoBotonVerUsuario}>Ver como usuario</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.botonCerrarSesion}
           onPress={cerrarSesion}
@@ -119,16 +132,7 @@ export default function AdminDashboardScreen() {
           <Ionicons name="log-out-outline" size={18} color="#D32F2F" />
           <Text style={styles.textoBotonCerrarSesion}>Cerrar sesión</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Botón flotante: Ver como usuario */}
-      <TouchableOpacity
-        style={styles.botonFlotante}
-        onPress={() => router.push("/(tabs)/home")}
-      >
-        <Ionicons name="eye-outline" size={18} color="#fff" />
-        <Text style={styles.textoBotonFlotante}>Ver como usuario</Text>
-      </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
@@ -169,7 +173,7 @@ function TarjetaResumen({
 const styles = StyleSheet.create({
   contenedor: { flex: 1 },
   centrado: { flex: 1, justifyContent: "center", alignItems: "center" },
-  cuerpo: { flex: 1, paddingHorizontal: 20, paddingBottom: 100 },
+  cuerpo: { flex: 1, paddingHorizontal: 20 },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -210,11 +214,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   textoAcceso: { flex: 1, fontSize: 15, fontWeight: "600" },
-  botonCerrarSesion: {
+  botonVerUsuario: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 24,
+    paddingVertical: 15,
+    borderRadius: 16,
+    backgroundColor: "#3B6FA0",
+    gap: 8,
+  },
+  textoBotonVerUsuario: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  botonCerrarSesion: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 12,
     paddingVertical: 15,
     borderRadius: 16,
     backgroundColor: "#FDEAEA",
@@ -225,22 +240,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 15,
   },
-  botonFlotante: {
-    position: "absolute",
-    bottom: 20,
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#3B6FA0",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 26,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-  },
-  textoBotonFlotante: { color: "#fff", fontWeight: "600", fontSize: 14 },
 });

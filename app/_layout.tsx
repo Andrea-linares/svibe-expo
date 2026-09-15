@@ -22,7 +22,6 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
-
           <Stack.Screen
             name="admin/hito-formulario"
             options={{ headerShown: false }}

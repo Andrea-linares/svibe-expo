@@ -1,7 +1,8 @@
 import AdminHeader from "@/components/admin/admin-header";
 import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
-import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -239,6 +240,15 @@ export default function AdminUsuariosScreen() {
               </View>
 
               <TouchableOpacity
+                style={styles.botonOjo}
+                onPress={() =>
+                  router.push(`/admin/detalle-usuario?id=${item.id}`)
+                }
+              >
+                <Ionicons name="eye-outline" size={20} color="#3B6FA0" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.botonRol}
                 onPress={() => alternarRol(item)}
               >
@@ -308,7 +318,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
-    gap: 12,
+    gap: 10,
     elevation: 2,
   },
   avatar: {
@@ -326,6 +336,14 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
     marginTop: 5,
+  },
+  botonOjo: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#EAF2FA",
+    justifyContent: "center",
+    alignItems: "center",
   },
   botonRol: {
     paddingHorizontal: 12,

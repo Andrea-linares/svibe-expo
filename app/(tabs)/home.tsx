@@ -453,6 +453,10 @@ export default function HomeScreen() {
       router.push("/insignias");
       return;
     }
+    if (opcion === "Reportar un problema") {
+      router.push("/reportar-problema");
+      return;
+    }
 
     console.log(`Opción seleccionada: ${opcion}`);
   }

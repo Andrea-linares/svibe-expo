@@ -1,5 +1,6 @@
 import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import { Ionicons } from "@expo/vector-icons";
 import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
@@ -19,6 +20,8 @@ import {
 } from "react-native";
 
 type Categoria = { id: number; nombre: string };
+
+type ImagenExistente = { id: number; url: string; orden: number };
 
 export default function HitoFormularioScreen() {
   const { colores } = useTema();
@@ -48,10 +51,12 @@ export default function HitoFormularioScreen() {
   const [horaApertura, setHoraApertura] = useState("08:00");
   const [horaCierre, setHoraCierre] = useState("17:00");
 
-  const [imagenSeleccionada, setImagenSeleccionada] = useState<string | null>(
-    null,
-  );
-  const [subiendoImagen, setSubiendoImagen] = useState(false);
+  // ---- Imágenes ----
+  const [imagenesExistentes, setImagenesExistentes] = useState<
+    ImagenExistente[]
+  >([]);
+  const [imagenesNuevas, setImagenesNuevas] = useState<string[]>([]);
+  const [subiendoImagenes, setSubiendoImagenes] = useState(false);
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -75,6 +80,14 @@ export default function HitoFormularioScreen() {
           setHoraApertura(horarioExistente.hora_apertura.slice(0, 5));
           setHoraCierre(horarioExistente.hora_cierre.slice(0, 5));
         }
+
+        const { data: imagenesData } = await supabase
+          .from("hito_imagenes")
+          .select("id, url, orden")
+          .eq("hito_id", id)
+          .order("orden", { ascending: true });
+        setImagenesExistentes(imagenesData ?? []);
+
         const { data } = await supabase
           .from("hitos")
           .select("*")
@@ -113,14 +126,35 @@ export default function HitoFormularioScreen() {
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           busquedaDireccion + ", El Salvador",
         )}`,
-        { headers: { "Accept-Language": "es" } },
+        {
+          headers: {
+            "Accept-Language": "es",
+            "User-Agent": "SVibeApp/1.0 (contacto@svibe.app)",
+          },
+        },
       );
+
+      if (!respuesta.ok) {
+        const textoError = await respuesta.text();
+        console.log(
+          "Nominatim respondió con error:",
+          respuesta.status,
+          textoError,
+        );
+        Alert.alert(
+          "Error del servidor de mapas",
+          `El buscador de direcciones respondió con un error (código ${respuesta.status}). Intenta de nuevo en unos segundos.`,
+        );
+        return;
+      }
+
       const datos = await respuesta.json();
       setResultadosDireccion(datos);
-    } catch (error) {
+    } catch (error: any) {
+      console.log("Error real al buscar dirección:", error);
       Alert.alert(
-        "Error",
-        "No se pudo buscar la dirección. Verifica tu conexión.",
+        "No se pudo buscar",
+        `Detalle técnico: ${error?.message ?? "desconocido"}`,
       );
     } finally {
       setBuscandoDireccion(false);
@@ -135,13 +169,13 @@ export default function HitoFormularioScreen() {
     setBusquedaDireccion("");
   }
 
-  // ---- Selector de imagen ----
-  async function elegirImagen() {
+  // ---- Selector de imágenes (ahora permite elegir varias) ----
+  async function elegirImagenes() {
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permiso.granted) {
       Alert.alert(
         "Permiso necesario",
-        "Necesitamos acceso a tu galería para subir la foto.",
+        "Necesitamos acceso a tu galería para subir fotos.",
       );
       return;
     }
@@ -149,51 +183,94 @@ export default function HitoFormularioScreen() {
     const resultado = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
+      allowsMultipleSelection: true,
     });
 
     if (!resultado.canceled) {
-      setImagenSeleccionada(resultado.assets[0].uri);
+      const nuevasUris = resultado.assets.map((a) => a.uri);
+      setImagenesNuevas((actual) => [...actual, ...nuevasUris]);
     }
   }
 
-  async function subirImagenYVincular(hitoId: string) {
-    if (!imagenSeleccionada) return;
+  // Quita una imagen recién elegida (todavía no se ha subido)
+  function quitarImagenNueva(uri: string) {
+    setImagenesNuevas((actual) => actual.filter((u) => u !== uri));
+  }
 
-    setSubiendoImagen(true);
+  // Elimina una imagen que YA está guardada en la base de datos
+  function confirmarEliminarImagenExistente(imagen: ImagenExistente) {
+    Alert.alert(
+      "Eliminar foto",
+      "¿Seguro que quieres eliminar esta foto? Esta acción no se puede deshacer.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            const { error } = await supabase
+              .from("hito_imagenes")
+              .delete()
+              .eq("id", imagen.id);
 
-    const base64 = await FileSystem.readAsStringAsync(imagenSeleccionada, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+            if (error) {
+              Alert.alert("Error al eliminar", error.message);
+              return;
+            }
 
-    const nombreArchivo = `${hitoId}-${Date.now()}.jpg`;
+            setImagenesExistentes((actual) =>
+              actual.filter((img) => img.id !== imagen.id),
+            );
+          },
+        },
+      ],
+    );
+  }
 
-    const { error: errorSubida } = await supabase.storage
-      .from("hitos-imagenes")
-      .upload(nombreArchivo, decode(base64), { contentType: "image/jpeg" });
+  // Sube todas las imágenes nuevas y las vincula al hito
+  async function subirImagenesYVincular(hitoId: string) {
+    if (imagenesNuevas.length === 0) return;
 
-    if (errorSubida) {
-      Alert.alert("Error al subir imagen", errorSubida.message);
-      setSubiendoImagen(false);
-      return;
-    }
+    setSubiendoImagenes(true);
 
-    const { data: urlPublica } = supabase.storage
-      .from("hitos-imagenes")
-      .getPublicUrl(nombreArchivo);
+    const ordenBase = imagenesExistentes.length;
 
-    const { error: errorInsertarImagen } = await supabase
-      .from("hito_imagenes")
-      .insert({
-        hito_id: hitoId,
-        url: urlPublica.publicUrl,
-        orden: 1,
+    for (let i = 0; i < imagenesNuevas.length; i++) {
+      const uri = imagenesNuevas[i];
+
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
       });
 
-    if (errorInsertarImagen) {
-      Alert.alert("Error al vincular imagen", errorInsertarImagen.message);
+      const nombreArchivo = `${hitoId}-${Date.now()}-${i}.jpg`;
+
+      const { error: errorSubida } = await supabase.storage
+        .from("hitos-imagenes")
+        .upload(nombreArchivo, decode(base64), { contentType: "image/jpeg" });
+
+      if (errorSubida) {
+        Alert.alert("Error al subir imagen", errorSubida.message);
+        continue;
+      }
+
+      const { data: urlPublica } = supabase.storage
+        .from("hitos-imagenes")
+        .getPublicUrl(nombreArchivo);
+
+      const { error: errorInsertarImagen } = await supabase
+        .from("hito_imagenes")
+        .insert({
+          hito_id: hitoId,
+          url: urlPublica.publicUrl,
+          orden: ordenBase + i + 1,
+        });
+
+      if (errorInsertarImagen) {
+        Alert.alert("Error al vincular imagen", errorInsertarImagen.message);
+      }
     }
 
-    setSubiendoImagen(false);
+    setSubiendoImagenes(false);
   }
 
   // ---- Guardar (crear o editar) ----
@@ -232,8 +309,8 @@ export default function HitoFormularioScreen() {
     }
 
     // "data" trae el UUID del hito recién creado/editado (lo devuelve la función RPC)
-    if (imagenSeleccionada && data) {
-      await subirImagenYVincular(data as string);
+    if (imagenesNuevas.length > 0 && data) {
+      await subirImagenesYVincular(data as string);
     }
     if (data) {
       await supabase.from("horarios_hito").delete().eq("hito_id", data);
@@ -269,31 +346,50 @@ export default function HitoFormularioScreen() {
         {esEdicion ? "Editar lugar" : "Nuevo lugar"}
       </Text>
 
-      {/* Selector de imagen */}
-      <TouchableOpacity onPress={elegirImagen} style={{ marginBottom: 16 }}>
-        {imagenSeleccionada ? (
-          <Image
-            source={{ uri: imagenSeleccionada }}
-            style={{ width: "100%", height: 160, borderRadius: 12 }}
-          />
-        ) : (
-          <View
-            style={{
-              height: 100,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: colores.borde,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: colores.textoSecundario }}>
-              Toca para elegir una imagen
-            </Text>
+      {/* Selector de imágenes múltiple */}
+      <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>
+        Fotos
+      </Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 16 }}
+        contentContainerStyle={{ gap: 10 }}
+      >
+        {imagenesExistentes.map((img) => (
+          <View key={`existente-${img.id}`} style={styles.miniaturaContenedor}>
+            <Image source={{ uri: img.url }} style={styles.miniatura} />
+            <TouchableOpacity
+              style={styles.botonQuitar}
+              onPress={() => confirmarEliminarImagenExistente(img)}
+            >
+              <Ionicons name="close" size={13} color="#fff" />
+            </TouchableOpacity>
           </View>
-        )}
-        {subiendoImagen && <ActivityIndicator style={{ marginTop: 8 }} />}
-      </TouchableOpacity>
+        ))}
+
+        {imagenesNuevas.map((uri, index) => (
+          <View key={`nueva-${index}`} style={styles.miniaturaContenedor}>
+            <Image source={{ uri }} style={styles.miniatura} />
+            <TouchableOpacity
+              style={styles.botonQuitar}
+              onPress={() => quitarImagenNueva(uri)}
+            >
+              <Ionicons name="close" size={13} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        <TouchableOpacity
+          style={[styles.botonAgregarImagen, { borderColor: colores.borde }]}
+          onPress={elegirImagenes}
+        >
+          <Ionicons name="add" size={26} color={colores.textoSecundario} />
+        </TouchableOpacity>
+      </ScrollView>
+      {subiendoImagenes && (
+        <ActivityIndicator style={{ marginBottom: 12 }} color="#3B6FA0" />
+      )}
 
       <Campo
         etiqueta="Nombre *"
@@ -577,4 +673,35 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   textoBotonGuardar: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  miniaturaContenedor: {
+    width: 84,
+    height: 84,
+    borderRadius: 12,
+    overflow: "visible",
+  },
+  miniatura: {
+    width: 84,
+    height: 84,
+    borderRadius: 12,
+  },
+  botonQuitar: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#D32F2F",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  botonAgregarImagen: {
+    width: 84,
+    height: 84,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 });

@@ -4,13 +4,12 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 
 type Perfil = {
@@ -220,18 +219,12 @@ export default function PerfilScreen() {
 
       {/* Lista de secciones */}
       <View style={styles.tarjetaLista}>
-        <TouchableOpacity
-          style={styles.filaLista}
-          activeOpacity={0.6}
-          onPress={() =>
-            Alert.alert(
-              "Mis Rutas Guardadas",
-              rutas.length > 0
-                ? rutas.map((r) => `• ${r.nombre}`).join("\n")
-                : "Todavía no tienes rutas guardadas.",
-            )
-          }
-        >
+          <TouchableOpacity
+            style={styles.filaLista}
+            activeOpacity={0.6}
+            onPress={() => router.push("/mis-rutas" as any)}
+          >
+      
           <View style={styles.iconoFilaLista}>
             <Ionicons name="map-outline" size={19} color="#3B6FA0" />
           </View>

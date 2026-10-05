@@ -102,7 +102,7 @@ export default function MapaScreen() {
     </html>
   `;
 
-  return (
+   return (
     <View style={{ flex: 1 }}>
       <WebView
         originWhitelist={["*"]}
@@ -114,6 +114,14 @@ export default function MapaScreen() {
           if (hito) setSeleccionado(hito);
         }}
       />
+
+      {/* Botón flotante: ruta desde mi ubicación */}
+      <TouchableOpacity
+        style={styles.botonCercaDeMi}
+        onPress={() => router.push("/rutas" as any)}
+      >
+        <Text style={styles.textoBotonRutas}>📍 Rutas cerca de mí</Text>
+      </TouchableOpacity>
 
       {/* Mini tarjeta flotante al tocar un marcador */}
       {seleccionado && (
@@ -151,6 +159,18 @@ export default function MapaScreen() {
             onPress={() => router.push(`/hito/${seleccionado.id}`)}
           >
             <Text style={styles.textoBotonDetalle}>Ver más detalles</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.botonRutas}
+            onPress={() =>
+              router.push({
+                pathname: "/rutas" as any,
+                params: { hitoId: seleccionado.id },
+              })
+            }
+          >
+            <Text style={styles.textoBotonRutas}>Ver rutas sugeridas</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -196,4 +216,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   textoBotonDetalle: { color: "#fff", fontWeight: "600" },
+  botonRutas: {
+  marginTop: 8,
+  borderWidth: 1.5,
+  borderColor: "#5B9BD5",
+  borderRadius: 10,
+  paddingVertical: 12,
+  alignItems: "center",
+},
+textoBotonRutas: { color: "#5B9BD5", fontWeight: "600" },
+botonCercaDeMi: {
+  position: "absolute",
+  top: 16,
+  alignSelf: "center",
+  backgroundColor: "#fff",
+  borderRadius: 20,
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  elevation: 6,
+  shadowColor: "#000",
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 2 },
+},
 });

@@ -1,4 +1,5 @@
 import { TemaProvider } from "@/contexts/ThemeContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Stack } from "expo-router";
 import {
   DarkTheme,
@@ -8,12 +9,6 @@ import {
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
-
-export const unstable_settings = {
-  anchor: "(tabs)",
-};
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
@@ -21,44 +16,22 @@ export default function RootLayout() {
     <TemaProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack>
-          <Stack.Screen
-            name="admin/reporte-detalle"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="mis-reportes" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="reporte-detalle"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="reportar-problema"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="admin/hito-formulario"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="registro" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="verificar-codigo"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="olvide-password"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="verificar-recuperacion"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="nueva-contrasena"
-            options={{ headerShown: false }}
-          />
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="registro" options={{ headerShown: false }} />
+          <Stack.Screen name="verificar-codigo" options={{ headerShown: false }} />
+          <Stack.Screen name="olvide-password" options={{ headerShown: false }} />
+          <Stack.Screen name="verificar-recuperacion" options={{ headerShown: false }} />
+          <Stack.Screen name="nueva-contrasena" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/hito-formulario" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/reporte-detalle" options={{ headerShown: false }} />
+          <Stack.Screen name="mis-reportes" options={{ headerShown: false }} />
+          <Stack.Screen name="reporte-detalle" options={{ headerShown: false }} />
+          <Stack.Screen name="reportar-problema" options={{ headerShown: false }} />
+          <Stack.Screen name="rutas" options={{ headerShown: false }} />
+          <Stack.Screen name="mis-rutas" options={{ headerShown: false }} />
           <Stack.Screen name="hito/[id]" options={{ title: "" }} />
           <Stack.Screen
             name="modal"

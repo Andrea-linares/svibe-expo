@@ -1,6 +1,11 @@
 import { BotonTema } from "@/components/BotonTema";
+import TarjetaLugar, { obtenerImagenPrincipal } from "@/components/TarjetaLugar";
+import { COLOR_ACENTO } from "@/constants/theme";
 import { useTema } from "@/contexts/ThemeContext";
+import { Evento, obtenerEventosDeHoy } from "@/lib/eventos";
+import { formatearHora, hoyLocal } from "@/lib/fechas";
 import { supabase } from "@/lib/supabase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -72,6 +77,9 @@ const RANGOS_PRECIO = [
 
 const ANCHO_TARJETA_CARRUSEL = 172;
 
+// Guarda la fecha ("YYYY-MM-DD") en que se cerró el aviso de eventos de hoy
+const CLAVE_AVISO_EVENTOS_CERRADO = "aviso_eventos_cerrado";
+
 export default function HomeScreen() {
   const { colores } = useTema();
 
@@ -112,6 +120,10 @@ export default function HomeScreen() {
   );
 
   const [guardandoOnboarding, setGuardandoOnboarding] = useState(false);
+
+  // Aviso "Hoy en [lugar]: [evento]"
+  const [eventosHoy, setEventosHoy] = useState<Evento[]>([]);
+  const [avisoCerrado, setAvisoCerrado] = useState(true);
 
   const scrollCarruselRef = useRef<ScrollView>(null);
   const indiceCarruselRef = useRef(0);
@@ -157,6 +169,28 @@ export default function HomeScreen() {
     } finally {
       setVerificandoPreferencias(false);
     }
+  }
+
+  async function cargarAvisoEventos() {
+    try {
+      const [eventos, fechaCerrado] = await Promise.all([
+        obtenerEventosDeHoy(),
+        AsyncStorage.getItem(CLAVE_AVISO_EVENTOS_CERRADO),
+      ]);
+      setEventosHoy(eventos);
+      setAvisoCerrado(fechaCerrado === hoyLocal());
+    } catch (error) {
+      console.error("Error cargando eventos de hoy:", error);
+      setEventosHoy([]);
+    }
+  }
+
+  // El aviso queda oculto el resto del día
+  function cerrarAvisoEventos() {
+    setAvisoCerrado(true);
+    AsyncStorage.setItem(CLAVE_AVISO_EVENTOS_CERRADO, hoyLocal()).catch((error) =>
+      console.error("Error guardando aviso cerrado:", error),
+    );
   }
 
   function toggleCategoriaOnboarding(id: number) {
@@ -242,6 +276,8 @@ export default function HomeScreen() {
             });
 
           setCategorias(cats ?? []);
+
+          cargarAvisoEventos();
 
           await cargarPreferencias();
         } catch (error) {
@@ -429,6 +465,11 @@ export default function HomeScreen() {
   function seleccionarOpcionMenu(opcion: string) {
     setMenuAbierto(false);
 
+    if (opcion === "Favoritos") {
+      router.push("/favoritos");
+      return;
+    }
+
     if (opcion === "Quiz") {
       router.push("/quiz");
       return;
@@ -521,6 +562,11 @@ export default function HomeScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Aviso de eventos de hoy (solo dentro de la app) */}
+      {!hayFiltrosActivos && !avisoCerrado && eventosHoy.length > 0 && (
+        <AvisoEventosHoy eventos={eventosHoy} onCerrar={cerrarAvisoEventos} />
+      )}
 
       {cargando ? (
         <View style={styles.centrado}>
@@ -657,9 +703,9 @@ export default function HomeScreen() {
             Lugares imprescindibles
           </Text>
 
-          <View style={styles.grid}>
+          <View style={styles.listaLugares}>
             {imprescindibles.map((hito) => (
-              <TarjetaGrid key={hito.id} hito={hito} />
+              <TarjetaLugar key={hito.id} hito={hito} />
             ))}
           </View>
         </ScrollView>
@@ -1016,18 +1062,6 @@ export default function HomeScreen() {
   );
 }
 
-function obtenerImagenPrincipal(hito: Hito) {
-  if (hito.hito_imagenes && hito.hito_imagenes.length > 0) {
-    const ordenadas = [...hito.hito_imagenes].sort((a, b) => a.orden - b.orden);
-
-    return {
-      uri: ordenadas[0].url,
-    };
-  }
-
-  return require("@/assets/images/partial-react-logo.png");
-}
-
 function TarjetaCarrusel({ hito }: { hito: Hito }) {
   const { colores } = useTema();
 
@@ -1060,6 +1094,56 @@ function TarjetaCarrusel({ hito }: { hito: Hito }) {
     </TouchableOpacity>
   );
 }
+function AvisoEventosHoy({
+  eventos,
+  onCerrar,
+}: {
+  eventos: Evento[];
+  onCerrar: () => void;
+}) {
+  const { colores } = useTema();
+  const primero = eventos[0];
+  const otros = eventos.length - 1;
+
+  const texto = primero.hito
+    ? `Hoy en ${primero.hito.nombre}: ${primero.titulo}`
+    : `Hoy: ${primero.titulo}`;
+
+  return (
+    <TouchableOpacity
+      style={[styles.aviso, { backgroundColor: colores.tarjeta }]}
+      activeOpacity={0.85}
+      onPress={() =>
+        router.push(otros > 0 ? "/eventos" : `/eventos/${primero.id}`)
+      }
+    >
+      <View style={styles.iconoAviso}>
+        <Ionicons name="calendar" size={18} color={COLOR_ACENTO} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.tituloAviso, { color: colores.texto }]}>
+          ¡Te podría interesar!
+        </Text>
+        <Text
+          style={[styles.textoAviso, { color: colores.textoSecundario }]}
+          numberOfLines={2}
+        >
+          {texto}
+          {primero.hora ? ` · ${formatearHora(primero.hora)}` : ""}
+          {otros > 0 ? ` y ${otros} más` : ""}
+        </Text>
+      </View>
+      <TouchableOpacity
+        onPress={onCerrar}
+        hitSlop={10}
+        accessibilityLabel="Cerrar aviso"
+      >
+        <Ionicons name="close" size={18} color={colores.textoSecundario} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
 function ItemMenu({
   icono,
   texto,
@@ -1194,6 +1278,43 @@ const styles = StyleSheet.create({
     backgroundColor: "#2196F3",
   },
 
+  aviso: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: COLOR_ACENTO,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+
+  iconoAviso: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#E3EEF8",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  tituloAviso: {
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+
+  textoAviso: {
+    fontSize: 13,
+    marginTop: 2,
+    lineHeight: 18,
+  },
+
   tituloSeccion: {
     fontSize: 20,
     fontWeight: "bold",
@@ -1248,6 +1369,12 @@ const styles = StyleSheet.create({
   verTodas: {
     color: "#2196F3",
     fontWeight: "600",
+  },
+
+  // Lugares imprescindibles: una columna de ancho completo
+  listaLugares: {
+    paddingHorizontal: 20,
+    gap: 16,
   },
 
   grid: {

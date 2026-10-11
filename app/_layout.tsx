@@ -1,3 +1,4 @@
+import { FavoritosProvider } from "@/contexts/FavoritosContext";
 import { TemaProvider } from "@/contexts/ThemeContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Stack } from "expo-router";
@@ -14,32 +15,39 @@ export default function RootLayout() {
 
   return (
     <TemaProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="registro" options={{ headerShown: false }} />
-          <Stack.Screen name="verificar-codigo" options={{ headerShown: false }} />
-          <Stack.Screen name="olvide-password" options={{ headerShown: false }} />
-          <Stack.Screen name="verificar-recuperacion" options={{ headerShown: false }} />
-          <Stack.Screen name="nueva-contrasena" options={{ headerShown: false }} />
-          <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="admin/hito-formulario" options={{ headerShown: false }} />
-          <Stack.Screen name="admin/reporte-detalle" options={{ headerShown: false }} />
-          <Stack.Screen name="mis-reportes" options={{ headerShown: false }} />
-          <Stack.Screen name="reporte-detalle" options={{ headerShown: false }} />
-          <Stack.Screen name="reportar-problema" options={{ headerShown: false }} />
-          <Stack.Screen name="rutas" options={{ headerShown: false }} />
-          <Stack.Screen name="mis-rutas" options={{ headerShown: false }} />
-          <Stack.Screen name="hito/[id]" options={{ title: "" }} />
-          <Stack.Screen
-            name="modal"
-            options={{ presentation: "modal", title: "Modal" }}
-          />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <FavoritosProvider>
+        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="registro" options={{ headerShown: false }} />
+            <Stack.Screen name="verificar-codigo" options={{ headerShown: false }} />
+            <Stack.Screen name="olvide-password" options={{ headerShown: false }} />
+            <Stack.Screen name="verificar-recuperacion" options={{ headerShown: false }} />
+            <Stack.Screen name="nueva-contrasena" options={{ headerShown: false }} />
+            <Stack.Screen name="admin/(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="admin/hito-formulario" options={{ headerShown: false }} />
+            <Stack.Screen name="admin/reporte-detalle" options={{ headerShown: false }} />
+            <Stack.Screen name="mis-reportes" options={{ headerShown: false }} />
+            <Stack.Screen name="reporte-detalle" options={{ headerShown: false }} />
+            <Stack.Screen name="reportar-problema" options={{ headerShown: false }} />
+            <Stack.Screen name="rutas" options={{ headerShown: false }} />
+            <Stack.Screen name="mis-rutas" options={{ headerShown: false }} />
+            <Stack.Screen name="favoritos" options={{ headerShown: false }} />
+            <Stack.Screen name="eventos/index" options={{ headerShown: false }} />
+            <Stack.Screen name="eventos/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="eventos/hito/[hitoId]" options={{ headerShown: false }} />
+            <Stack.Screen name="admin/evento-formulario" options={{ headerShown: false }} />
+            <Stack.Screen name="hito/[id]" options={{ title: "" }} />
+            <Stack.Screen
+              name="modal"
+              options={{ presentation: "modal", title: "Modal" }}
+            />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </FavoritosProvider>
     </TemaProvider>
   );
 }

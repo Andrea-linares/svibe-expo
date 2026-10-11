@@ -1,8 +1,14 @@
 import InfoModal from "@/components/InfoModal";
+import Toast from "@/components/Toast";
+import { COLOR_FAVORITOS } from "@/constants/theme";
+import { useFavoritos } from "@/hooks/use-favoritos";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { revisarYCompletarRetos } from "@/hooks/use-retos";
+import { Evento, obtenerEventosVigentes } from "@/lib/eventos";
+import { formatearHora, partesFecha } from "@/lib/fechas";
 import { supabase } from "@/lib/supabase";
-import { useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator, Alert, Dimensions,
@@ -70,6 +76,31 @@ const [mostrarFeedback, setMostrarFeedback] = useState(false);
 const [feedbackEnviado, setFeedbackEnviado] = useState<
   "interesado" | "no_interesado" | null
 >(null);
+
+  const { esFavorito, alternarFavorito } = useFavoritos();
+  const [toastVisible, setToastVisible] = useState(false);
+
+  async function alternarFavoritoHito() {
+    if (!id) return;
+    const resultado = await alternarFavorito(id);
+    if (resultado === "quitado") setToastVisible(true);
+  }
+
+  // Próximo evento del lugar (para la tarjeta "Eventos")
+  const [proximoEvento, setProximoEvento] = useState<Evento | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelado = false;
+    obtenerEventosVigentes(id)
+      .then((eventos) => {
+        if (!cancelado) setProximoEvento(eventos[0] ?? null);
+      })
+      .catch((error) => console.error("Error cargando próximo evento:", error));
+    return () => {
+      cancelado = true;
+    };
+  }, [id]);
 
   useEffect(() => {
     async function cargarDatos() {
@@ -186,9 +217,20 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
   const estado = calcularEstado(horarios);
 
   const imagenesCarrusel = imagenes.slice(0, MAX_IMAGENES_CARRUSEL);
+  const favorito = esFavorito(hito.id);
+
+  // "Festival Cultural · 18 SEP, 6:00 PM"
+  let textoProximoEvento = "Sin eventos próximos";
+  if (proximoEvento) {
+    const { dia, mesCorto } = partesFecha(proximoEvento.fecha);
+    const hora = proximoEvento.hora ? `, ${formatearHora(proximoEvento.hora)}` : "";
+    textoProximoEvento = `${proximoEvento.titulo} · ${dia} ${mesCorto}${hora}`;
+  }
 
   return (
+    <View style={styles.contenedor}>
     <ScrollView style={styles.contenedor}>
+      <View>
       {/* bloque completo de imagen principal reemplazado por carrusel + botón de galería */}
       {imagenes.length > 0 ? (
         <View>
@@ -246,6 +288,22 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
           style={styles.imagenPrincipal}
         />
       )}
+
+        {/* Corazón de favorito sobre la imagen */}
+        <TouchableOpacity
+          style={styles.botonCorazon}
+          onPress={alternarFavoritoHito}
+          accessibilityRole="button"
+          accessibilityLabel={favorito ? "Quitar de favoritos" : "Guardar en favoritos"}
+          hitSlop={8}
+        >
+          <Ionicons
+            name={favorito ? "heart" : "heart-outline"}
+            size={24}
+            color={COLOR_FAVORITOS}
+          />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.contenido}>
         {/* Título */}
@@ -480,21 +538,13 @@ Conoce algo interesante.
 
 
 
-{/* EVENTOS */}
+{/* EVENTOS: muestra el próximo evento y abre la lista de eventos del hito */}
 
 <TouchableOpacity
 
 style={styles.cardInfo}
 
-onPress={()=>{
-
-setTituloModal("Eventos");
-
-setTextoModal(hito.eventos_info || "No disponible.");
-
-setModalVisible(true);
-
-}}
+onPress={() => router.push(`/eventos/hito/${hito.id}`)}
 
 >
 
@@ -507,7 +557,7 @@ numberOfLines={2}
 style={styles.descripcionCard}
 >
 
-Actividades del lugar.
+{textoProximoEvento}
 
 </Text>
 
@@ -628,6 +678,13 @@ Actividades del lugar.
       />
 
     </ScrollView>
+
+      <Toast
+        visible={toastVisible}
+        mensaje="El lugar se eliminó de tus favoritos"
+        onOcultar={() => setToastVisible(false)}
+      />
+    </View>
   );
 }
 
@@ -670,13 +727,6 @@ function nombreDia(dia: number) {
     "Sábado",
   ];
   return dias[dia];
-}
-
-function formatearHora(hora: string) {
-  const [h, m] = hora.split(":").map(Number);
-  const periodo = h >= 12 ? "PM" : "AM";
-  const hora12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hora12}:${m.toString().padStart(2, "0")} ${periodo}`;
 }
 
 // ===== FUNCIÓN NUEVA PARA AGRUPAR HORARIOS =====
@@ -749,6 +799,20 @@ const styles = StyleSheet.create({
   contenido: { padding: 16 },
   titulo: { fontSize: 26, fontWeight: "bold", color: "#000" },
   ubicacion: { fontSize: 14, color: "#444", marginTop: 8 },
+
+  // Favoritos: corazón sobre la imagen
+  botonCorazon: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+  },
   descripcion: { fontSize: 15, color: "#333", marginTop: 12, lineHeight: 22 },
   leerMas: {
     color: "#2E7D32",

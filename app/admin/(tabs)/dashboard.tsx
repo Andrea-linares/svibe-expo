@@ -1,5 +1,6 @@
 import AdminHeader from "@/components/admin/admin-header";
 import { useTema } from "@/contexts/ThemeContext";
+import { hoyLocal } from "@/lib/fechas";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -30,7 +31,12 @@ export default function AdminDashboardScreen() {
           supabase
             .from("reportes_problemas")
             .select("*", { count: "exact", head: true }),
-          supabase.from("eventos").select("*", { count: "exact", head: true }),
+          // Eventos próximos = activos: publicados y con fecha de hoy o futura
+          supabase
+            .from("eventos")
+            .select("*", { count: "exact", head: true })
+            .eq("publicado", true)
+            .gte("fecha", hoyLocal()),
         ]);
 
         setTotalUsuarios(usuarios.count ?? 0);

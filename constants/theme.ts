@@ -27,6 +27,13 @@ export const Colors = {
   },
 };
 
+// Color de acento principal de la app (botones, selección, enlaces).
+export const COLOR_ACENTO = '#3B6FA0';
+
+// Color de acento de la funcionalidad de Favoritos (corazón, botón, toast).
+// Cámbialo aquí para modificarlo en toda la app.
+export const COLOR_FAVORITOS = '#3B6FA0';
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

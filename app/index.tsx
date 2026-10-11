@@ -39,13 +39,6 @@ export default function BienvenidaScreen() {
             .eq("usuario_id", sesion.user.id);
 
           setTienePreferencias((count ?? 0) > 0);
-          console.log(
-            "🔍 Tiene preferencias:",
-            (count ?? 0) > 0,
-            "(",
-            count,
-            ")",
-          );
         } else {
           setEsAdmin(false);
           setTienePreferencias(false);

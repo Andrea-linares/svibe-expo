@@ -1,10 +1,12 @@
+import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
-import { router, Stack } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, Stack, useFocusEffect } from "expo-router";
+import { setStatusBarStyle } from "expo-status-bar";
+import { useCallback, useEffect, useState } from "react";
 
 import {
     ActivityIndicator,
@@ -19,6 +21,25 @@ import {
 } from "react-native";
 
 export default function EditarPerfilScreen() {
+  // Tema global (el mismo que Perfil); esta pantalla solo lo lee
+  const { colores, esOscuro } = useTema();
+
+  // Barra de estado según el tema mientras la pantalla está enfocada.
+  // Se aplica en el siguiente ciclo para que no la pise el "auto" que
+  // restablece Perfil al perder el foco.
+  useFocusEffect(
+    useCallback(() => {
+      const temporizador = setTimeout(
+        () => setStatusBarStyle(esOscuro ? "light" : "dark"),
+        0,
+      );
+      return () => {
+        clearTimeout(temporizador);
+        setStatusBarStyle("auto");
+      };
+    }, [esOscuro]),
+  );
+
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -149,21 +170,48 @@ export default function EditarPerfilScreen() {
 
   if (cargando) {
     return (
-      <View style={styles.centrado}>
-        <ActivityIndicator size="large" color="#3B6FA0" />
+      <View style={[styles.centrado, { backgroundColor: colores.fondo }]}>
+        <ActivityIndicator size="large" color={colores.acento} />
       </View>
     );
   }
 
+  // Texto sobre el color de acento: blanco en claro; en oscuro el acento es
+  // un azul claro, así que el texto va oscuro para mantener el contraste.
+  const textoSobreAcento = esOscuro ? colores.fondo : "#fff";
+
+  const estiloInput = [
+    styles.input,
+    {
+      backgroundColor: colores.fondo,
+      borderColor: esOscuro ? BORDE_INPUT_OSCURO : colores.borde,
+      color: colores.texto,
+    },
+  ];
+
+  const propsInput = {
+    placeholderTextColor: colores.textoSecundario,
+    cursorColor: colores.acento,
+    selectionColor: colores.acento,
+  };
+
     return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <ScrollView style={styles.contenedor} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={styles.encabezado}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1A2A3A" />
+      <ScrollView
+        style={[styles.contenedor, { backgroundColor: colores.fondo }]}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        <View
+          style={[
+            styles.encabezado,
+            { backgroundColor: colores.encabezado, borderBottomColor: colores.borde },
+          ]}
+        >
+        <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Volver">
+          <Ionicons name="arrow-back" size={24} color={colores.texto} />
         </TouchableOpacity>
-        <Text style={styles.tituloEncabezado}>Editar perfil</Text>
+        <Text style={[styles.tituloEncabezado, { color: colores.texto }]}>Editar perfil</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -176,66 +224,85 @@ export default function EditarPerfilScreen() {
                 ? { uri: fotoUrl }
                 : require("@/assets/images/partial-react-logo.png")
             }
-            style={styles.avatar}
+            style={[styles.avatar, { backgroundColor: colores.borde, borderColor: colores.borde }]}
           />
-          <View style={styles.botonCamara}>
+          <View
+            style={[
+              styles.botonCamara,
+              { backgroundColor: colores.acento, borderColor: colores.fondo },
+            ]}
+          >
             {subiendoFoto ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={textoSobreAcento} />
             ) : (
-              <Ionicons name="camera" size={16} color="#fff" />
+              <Ionicons name="camera" size={16} color={textoSobreAcento} />
             )}
           </View>
         </TouchableOpacity>
-        <Text style={styles.textoCambiarFoto}>Toca para cambiar tu foto</Text>
+        <Text style={[styles.textoCambiarFoto, { color: colores.acento }]}>
+          Toca para cambiar tu foto
+        </Text>
       </View>
 
-      {/* Formulario */}
-      <View style={styles.formulario}>
-        <Text style={styles.etiqueta}>Nombre</Text>
+      {/* Formulario: en oscuro, borde sutil en lugar de sombra */}
+      <View
+        style={[
+          styles.formulario,
+          { backgroundColor: colores.tarjeta },
+          esOscuro && { borderWidth: 1, borderColor: colores.borde },
+        ]}
+      >
+        <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Nombre</Text>
         <TextInput
-          style={styles.input}
+          style={estiloInput}
           value={nombre}
           onChangeText={setNombre}
           placeholder="Tu nombre"
-          placeholderTextColor="#999"
+          {...propsInput}
         />
 
-        <Text style={styles.etiqueta}>Apellido</Text>
+        <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Apellido</Text>
         <TextInput
-          style={styles.input}
+          style={estiloInput}
           value={apellido}
           onChangeText={setApellido}
           placeholder="Tu apellido"
-          placeholderTextColor="#999"
+          {...propsInput}
         />
 
-        <Text style={styles.etiqueta}>Ciudad</Text>
+        <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>Ciudad</Text>
         <TextInput
-          style={styles.input}
+          style={estiloInput}
           value={ciudad}
           onChangeText={setCiudad}
           placeholder="Tu ciudad"
-          placeholderTextColor="#999"
+          {...propsInput}
         />
       </View>
 
       <TouchableOpacity
-        style={styles.botonGuardar}
+        style={[styles.botonGuardar, { backgroundColor: colores.acento }]}
         onPress={guardarCambios}
         disabled={guardando || subiendoFoto}
       >
         {guardando ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={textoSobreAcento} />
         ) : (
-          <Text style={styles.textoBotonGuardar}>Guardar cambios</Text>
+          <Text style={[styles.textoBotonGuardar, { color: textoSobreAcento }]}>
+            Guardar cambios
+          </Text>
         )}
       </TouchableOpacity>
           </ScrollView>
     </>
   );
 }
+
+// Borde de los campos en oscuro: más visible que colores.borde (#333) sobre el fondo #121212
+const BORDE_INPUT_OSCURO = "#4A4A4A";
+
 const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: "#F5F6F8" },
+  contenedor: { flex: 1 },
   centrado: { flex: 1, justifyContent: "center", alignItems: "center" },
 
   encabezado: {
@@ -245,16 +312,16 @@ const styles = StyleSheet.create({
     paddingTop: 55,
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: "#fff",
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  tituloEncabezado: { fontSize: 17, fontWeight: "bold", color: "#1A2A3A" },
+  tituloEncabezado: { fontSize: 17, fontWeight: "bold" },
 
   seccionFoto: { alignItems: "center", marginTop: 28 },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#EEE",
+    borderWidth: 1,
   },
   botonCamara: {
     position: "absolute",
@@ -263,29 +330,24 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "#3B6FA0",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#F5F6F8",
   },
-  textoCambiarFoto: { fontSize: 13, color: "#3B6FA0", marginTop: 10 },
+  textoCambiarFoto: { fontSize: 13, marginTop: 10 },
 
   formulario: {
-    backgroundColor: "#fff",
     borderRadius: 18,
     marginHorizontal: 16,
     marginTop: 28,
     padding: 20,
   },
-  etiqueta: { fontSize: 13, color: "#777", marginBottom: 6, marginTop: 14 },
+  etiqueta: { fontSize: 13, marginBottom: 6, marginTop: 14 },
   input: {
     height: 46,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
     borderRadius: 10,
     paddingHorizontal: 14,
-    color: "#1A2A3A",
     fontSize: 15,
   },
 
@@ -293,10 +355,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 24,
     height: 52,
-    backgroundColor: "#3B6FA0",
     borderRadius: 26,
     justifyContent: "center",
     alignItems: "center",
   },
-  textoBotonGuardar: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  textoBotonGuardar: { fontSize: 15, fontWeight: "600" },
 });

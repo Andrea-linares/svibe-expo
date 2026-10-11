@@ -16,6 +16,8 @@ export const COLORES = {
     textoSecundario: "#666666",
     encabezado: "#FFFFFF",
     borde: "#E0E0E0",
+    acento: "#3B6FA0",
+    peligro: "#D32F2F",
   },
   oscuro: {
     fondo: "#121212",
@@ -24,6 +26,9 @@ export const COLORES = {
     textoSecundario: "#AAAAAA",
     encabezado: "#1A1A1A",
     borde: "#333333",
+    // Acento y peligro aclarados para mantener contraste sobre fondos oscuros
+    acento: "#7FB0E0",
+    peligro: "#FF6B6B",
   },
 };
 

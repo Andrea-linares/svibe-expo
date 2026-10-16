@@ -47,8 +47,8 @@ function describirCriterio(criterio: CriterioInsignia | null): string {
       return "Se obtiene al completar un reto";
     case "foro_comentarios_totales":
       return criterio.cantidad === 1
-      ? "Deja 1 comentario en el foro"
-      : `Deja ${criterio.cantidad} comentarios en el foro`;
+      ? "Escribe 1 reseña o comentario en el foro"
+      : `Escribe ${criterio.cantidad} reseñas o comentarios en el foro`;
     case "quiz_intentos":
       return `Responde el quiz ${criterio.cantidad} veces`;
     case "favoritos_totales":
@@ -122,13 +122,21 @@ async function cumpleCriterio(
       return (count ?? 0) >= 1;
     }
 
+    // Cuenta toda la participación en el foro: reseñas y comentarios
     case "foro_comentarios_totales": {
-      const { count, error } = await supabase
-        .from("foro_comentarios")
-        .select("*", { count: "exact", head: true })
-        .eq("usuario_id", usuarioId);
-      if (error) throw error;
-      return (count ?? 0) >= criterio.cantidad;
+      const [resenas, comentarios] = await Promise.all([
+        supabase
+          .from("foro_posts")
+          .select("*", { count: "exact", head: true })
+          .eq("usuario_id", usuarioId),
+        supabase
+          .from("foro_comentarios")
+          .select("*", { count: "exact", head: true })
+          .eq("usuario_id", usuarioId),
+      ]);
+      if (resenas.error) throw resenas.error;
+      if (comentarios.error) throw comentarios.error;
+      return (resenas.count ?? 0) + (comentarios.count ?? 0) >= criterio.cantidad;
     }
 
     case "quiz_intentos": {

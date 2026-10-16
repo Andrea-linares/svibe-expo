@@ -1,3 +1,4 @@
+import SeccionResenas from "@/components/foro/SeccionResenas";
 import InfoModal from "@/components/InfoModal";
 import Toast from "@/components/Toast";
 import { COLOR_FAVORITOS } from "@/constants/theme";
@@ -101,6 +102,9 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
       cancelado = true;
     };
   }, [id]);
+
+  // Aviso breve de la sección de reseñas
+  const [avisoResena, setAvisoResena] = useState<string | null>(null);
 
   useEffect(() => {
     async function cargarDatos() {
@@ -568,6 +572,9 @@ style={styles.descripcionCard}
 </TouchableOpacity>
 
 </ScrollView>
+
+        {/* RESEÑAS y comentarios del foro (HU-018) */}
+        <SeccionResenas hitoId={hito.id} nombreHito={hito.nombre} onAviso={setAvisoResena} />
       </View>
 
        <Modal
@@ -683,6 +690,12 @@ style={styles.descripcionCard}
         visible={toastVisible}
         mensaje="El lugar se eliminó de tus favoritos"
         onOcultar={() => setToastVisible(false)}
+      />
+      <Toast
+        visible={avisoResena !== null}
+        mensaje={avisoResena ?? ""}
+        icono="checkmark-circle"
+        onOcultar={() => setAvisoResena(null)}
       />
     </View>
   );

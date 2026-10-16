@@ -44,6 +44,7 @@ type DatosPerfil = {
   totalVisitados: number;
   totalRutas: number;
   totalLogros: number;
+  totalResenas: number;
   progreso: Progreso | null;
 };
 
@@ -60,7 +61,7 @@ const FONDO_TENUE: Record<Variante, string> = { claro: "#EEF4FA", oscuro: "#1A26
 /* ------------------------------ Datos ------------------------------------ */
 
 async function cargarDatosPerfil(userId: string): Promise<DatosPerfil> {
-  const [perfilRes, visitasRes, rutasRes, logrosRes, progresoRes] = await Promise.all([
+  const [perfilRes, visitasRes, rutasRes, logrosRes, progresoRes, resenasRes] = await Promise.all([
     // Datos del perfil
     supabase
       .from("perfiles")
@@ -90,6 +91,11 @@ async function cargarDatosPerfil(userId: string): Promise<DatosPerfil> {
       .select("puntos, nivel")
       .eq("usuario_id", userId)
       .maybeSingle(),
+    // Reseñas escritas en el foro
+    supabase
+      .from("foro_posts")
+      .select("*", { count: "exact", head: true })
+      .eq("usuario_id", userId),
   ]);
 
   const hitosUnicos = new Set((visitasRes.data ?? []).map((v) => v.hito_id));
@@ -99,6 +105,7 @@ async function cargarDatosPerfil(userId: string): Promise<DatosPerfil> {
     totalVisitados: hitosUnicos.size,
     totalRutas: rutasRes.data?.length ?? 0,
     totalLogros: logrosRes.data?.length ?? 0,
+    totalResenas: resenasRes.count ?? 0,
     progreso: progresoRes.data as Progreso | null,
   };
 }
@@ -350,6 +357,7 @@ export default function PerfilScreen() {
 
   const totalRutas = datos?.totalRutas ?? 0;
   const totalLogros = datos?.totalLogros ?? 0;
+  const totalResenas = datos?.totalResenas ?? 0;
   const separadorVertical = [styles.separadorVertical, { backgroundColor: colores.borde }];
 
   return (
@@ -415,6 +423,14 @@ export default function PerfilScreen() {
           subtitulo={pluralizar(totalLogros, "logro", "logros")}
           colores={colores}
           onPress={() => router.push("/insignias")}
+        />
+        <View style={[styles.separador, { backgroundColor: colores.borde }]} />
+        <FilaOpcion
+          icono="chatbubble-ellipses-outline"
+          titulo="Mis reseñas"
+          subtitulo={pluralizar(totalResenas, "reseña", "reseñas")}
+          colores={colores}
+          onPress={() => router.push("/mis-resenas")}
         />
       </View>
 

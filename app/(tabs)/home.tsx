@@ -498,6 +498,10 @@ export default function HomeScreen() {
       router.push("/reportar-problema");
       return;
     }
+    if (opcion === "Foro") {
+      router.push("/foro");
+      return;
+    }
 
     console.log(`Opción seleccionada: ${opcion}`);
   }

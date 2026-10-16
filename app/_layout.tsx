@@ -30,6 +30,8 @@ export default function RootLayout() {
             <Stack.Screen name="admin/hito-formulario" options={{ headerShown: false }} />
             <Stack.Screen name="admin/reporte-detalle" options={{ headerShown: false }} />
             <Stack.Screen name="mis-reportes" options={{ headerShown: false }} />
+            <Stack.Screen name="mis-resenas" options={{ headerShown: false }} />
+            <Stack.Screen name="foro" options={{ headerShown: false }} />
             <Stack.Screen name="reporte-detalle" options={{ headerShown: false }} />
             <Stack.Screen name="reportar-problema" options={{ headerShown: false }} />
             <Stack.Screen name="rutas" options={{ headerShown: false }} />

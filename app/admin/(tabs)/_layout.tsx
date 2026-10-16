@@ -62,6 +62,15 @@ export default function AdminTabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="foro"
+        options={{
+          title: "Foro",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

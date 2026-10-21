@@ -105,7 +105,7 @@ export default function AdminReportesScreen() {
   }
 
   return (
-    <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
+    <View style={[styles.contenedor, { backgroundColor: colores.panelFondo }]}>
       <Text style={[styles.titulo, { color: colores.texto }]}>
         Reportes de problemas
       </Text>

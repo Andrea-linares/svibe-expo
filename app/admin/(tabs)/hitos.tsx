@@ -102,7 +102,7 @@ export default function AdminHitosScreen() {
   }
 
   return (
-    <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
+    <View style={[styles.contenedor, { backgroundColor: colores.panelFondo }]}>
       <AdminHeader titulo="Hitos culturales" />
 
       {/* Tarjetas de estadísticas */}

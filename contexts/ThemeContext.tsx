@@ -18,6 +18,25 @@ export const COLORES = {
     borde: "#E0E0E0",
     acento: "#3B6FA0",
     peligro: "#D32F2F",
+    // Panel de administración
+    panelFondo: "#F4F7FB",
+    panelTarjeta: "#FFFFFF",
+    panelBorde: "#E3E8F0",
+    panelTexto: "#0F1B33",
+    panelTextoSecundario: "#6B7486",
+    panelIconoNeutro: "#EEF1F6",
+    panelIlustracion: "#9DB8DE",
+    panelIlustracionOpacidad: 0.14,
+    panelBarra: "#FFFFFF",
+    panelTabInactivo: "#8A93A3",
+    panelSombra: "#1B2A4A",
+    panelSombraOpacidad: 0.08,
+    // Acentos: iguales en ambos modos
+    panelAzul: "#2F7FEA",
+    panelAzulDegradado: "#1D5FC4",
+    panelDorado: "#D4A72C",
+    panelRosa: "#E0566F",
+    panelMorado: "#7C5CE0",
   },
   oscuro: {
     fondo: "#121212",
@@ -29,7 +48,39 @@ export const COLORES = {
     // Acento y peligro aclarados para mantener contraste sobre fondos oscuros
     acento: "#7FB0E0",
     peligro: "#FF6B6B",
+    // Panel de administración
+    panelFondo: "#0B1220",
+    panelTarjeta: "#121C30",
+    panelBorde: "#1F2B44",
+    panelTexto: "#FFFFFF",
+    panelTextoSecundario: "#9AA6BD",
+    panelIconoNeutro: "#2A3550",
+    panelIlustracion: "#24395F",
+    panelIlustracionOpacidad: 0.35,
+    panelBarra: "#121C30",
+    panelTabInactivo: "#6F7E99",
+    panelSombra: "#000000",
+    panelSombraOpacidad: 0,
+    // Acentos: iguales en ambos modos
+    panelAzul: "#2F7FEA",
+    panelAzulDegradado: "#1D5FC4",
+    panelDorado: "#D4A72C",
+    panelRosa: "#E0566F",
+    panelMorado: "#7C5CE0",
   },
+};
+
+// Espaciados y radios del panel de administración
+export const ESPACIADO_PANEL = {
+  margen: 20,
+  separacion: 12,
+  radioTarjeta: 16,
+  radioBoton: 18,
+  radioBarra: 24,
+  alturaBarra: 66,
+  margenBarra: 16,
+  margenInferiorBarra: 12,
+  grosorLinea: 4,
 };
 
 type TemaContextType = {

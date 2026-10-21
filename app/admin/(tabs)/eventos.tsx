@@ -126,7 +126,7 @@ export default function AdminEventosScreen() {
   );
 
   return (
-    <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
+    <View style={[styles.contenedor, { backgroundColor: colores.panelFondo }]}>
       <AdminHeader titulo="Eventos" accion={botonNuevo} />
 
       {/* Pestañas de filtro */}

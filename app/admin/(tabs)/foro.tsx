@@ -264,7 +264,7 @@ export default function AdminForoScreen() {
   }
 
   return (
-    <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
+    <View style={[styles.contenedor, { backgroundColor: colores.panelFondo }]}>
       <AdminHeader
         titulo="Foro"
         subtitulo={`${pluralizar(totales.resenas, "reseña", "reseñas")} · ${pluralizar(totales.comentarios, "comentario", "comentarios")}`}

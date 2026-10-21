@@ -112,7 +112,7 @@ export default function AdminUsuariosScreen() {
   }
 
   return (
-    <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
+    <View style={[styles.contenedor, { backgroundColor: colores.panelFondo }]}>
       <AdminHeader titulo="Usuarios" />
 
       {/* Tarjetas de estadísticas */}

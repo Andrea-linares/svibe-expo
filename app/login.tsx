@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMargenSuperior } from "@/hooks/use-margen-superior";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Image,
@@ -13,28 +13,99 @@ import {
   View,
 } from "react-native";
 
-import * as Google from "expo-auth-session/providers/google";
+import type { User } from "@supabase/supabase-js";
+import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 
 // Permite cerrar el navegador correctamente cuando el usuario vuelve de Google
 WebBrowser.maybeCompleteAuthSession();
+
+/* ---------------------------------------------------------------------------
+ * Login con Google mediante OAuth de Supabase (funciona en Expo Go).
+ * Google solo redirige al callback https de Supabase; Supabase devuelve la
+ * sesión a la app en la URL de retorno (exp://… en Expo Go, svibe://… en un
+ * build propio). El Client Secret vive solo en el panel de Supabase.
+ * ------------------------------------------------------------------------- */
+
+// Lee los parámetros de la URL de retorno: query (?code=…, ?error=…) y
+// fragmento (#access_token=…&refresh_token=…)
+function leerParametrosUrl(url: string) {
+  const [sinFragmento, fragmento = ""] = url.split("#");
+  const consulta = sinFragmento.split("?")[1] ?? "";
+  const parametros = new URLSearchParams(consulta);
+  new URLSearchParams(fragmento).forEach((valor, clave) => {
+    parametros.set(clave, valor);
+  });
+  return parametros;
+}
+
+// Crea la sesión de Supabase a partir de la URL de retorno.
+// Flujo implícito: tokens en el fragmento → setSession.
+// Flujo PKCE: ?code= → exchangeCodeForSession.
+async function crearSesionDesdeUrl(url: string): Promise<User> {
+  const parametros = leerParametrosUrl(url);
+
+  const mensajeError =
+    parametros.get("error_description") ?? parametros.get("error");
+  if (mensajeError) throw new Error(mensajeError);
+
+  const codigo = parametros.get("code");
+  if (codigo) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(codigo);
+    if (error) throw error;
+    return data.user;
+  }
+
+  const accessToken = parametros.get("access_token");
+  const refreshToken = parametros.get("refresh_token");
+  if (!accessToken || !refreshToken) {
+    throw new Error("Google no devolvió una sesión válida. Inténtalo de nuevo.");
+  }
+
+  const { data, error } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+  if (error) throw error;
+  if (!data.user) throw new Error("No se pudo obtener el usuario de Google.");
+  return data.user;
+}
+
+function textoONulo(valor: unknown) {
+  return typeof valor === "string" && valor.trim() ? valor.trim() : null;
+}
+
+// Crea la fila en `perfiles` si no existe, con los datos de Google.
+// ignoreDuplicates: si el perfil ya existe no se modifica (el usuario pudo
+// haber editado su nombre o foto). `rol` no se envía: toma su valor por defecto.
+async function asegurarPerfil(user: User) {
+  const meta = user.user_metadata ?? {};
+  const nombre =
+    textoONulo(meta.given_name) ??
+    textoONulo(meta.full_name) ??
+    textoONulo(meta.name) ??
+    "Usuario";
+
+  const { error } = await supabase.from("perfiles").upsert(
+    {
+      id: user.id,
+      nombre,
+      apellido: textoONulo(meta.family_name),
+      foto_perfil_url: textoONulo(meta.avatar_url) ?? textoONulo(meta.picture),
+    },
+    { onConflict: "id", ignoreDuplicates: true },
+  );
+
+  // Igual que en verificar-codigo: un fallo aquí no interrumpe el inicio de sesión
+  if (error) console.error("Error creando el perfil de Google:", error);
+}
 
 export default function LoginScreen() {
   const margenSuperior = useMargenSuperior(55);
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
-
-  //  Configuración para Google OAuth
-
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId:
-      "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
-    iosClientId:
-      "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
-    webClientId:
-      "552686781114-ccnrll69dqt97gjt5jre7b7t2qsos09q.apps.googleusercontent.com",
-  });
+  const [conectandoGoogle, setConectandoGoogle] = useState(false);
 
   // ---- Decide a dónde mandar según el rol del usuario que acaba de iniciar sesión ----
   async function irSegunRol() {
@@ -58,40 +129,38 @@ export default function LoginScreen() {
     }
   }
 
-  //  Efecto para manejar la respuesta cuando el usuario vuelve de Google
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { authentication } = response;
-
-      if (!authentication) return;
-
-      const accessToken = authentication.accessToken;
-      const idToken = authentication.idToken;
-
-      if (!accessToken || !idToken) return;
-
-      supabase.auth
-        .signInWithIdToken({
-          provider: "google",
-          access_token: accessToken,
-          token: idToken,
-        })
-        .then(({ error }) => {
-          if (error) {
-            Alert.alert("Error al iniciar sesión con Google", error.message);
-          } else {
-            irSegunRol();
-          }
-        });
-    }
-  }, [response]);
-
-  // 🔴 Función para iniciar sesión con Google
+  // Inicia sesión con Google: abre el navegador, espera la URL de retorno,
+  // crea la sesión y el perfil, y navega según el rol
   async function iniciarSesionGoogle() {
+    if (conectandoGoogle) return;
+    setConectandoGoogle(true);
+
     try {
-      await promptAsync();
-    } catch (error) {
-      Alert.alert("Error", "No se pudo abrir el navegador de Google.");
+      const redirectTo = Linking.createURL("auth/callback");
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error("No se pudo abrir el inicio de sesión de Google.");
+
+      const resultado = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      // El usuario cerró el navegador o canceló: no es un error
+      if (resultado.type !== "success") return;
+
+      const usuario = await crearSesionDesdeUrl(resultado.url);
+      // El perfil debe existir antes de leer el rol
+      await asegurarPerfil(usuario);
+      await irSegunRol();
+    } catch (error: any) {
+      Alert.alert(
+        "Error al iniciar sesión con Google",
+        error?.message ?? "Inténtalo de nuevo.",
+      );
+    } finally {
+      setConectandoGoogle(false);
     }
   }
 
@@ -196,7 +265,7 @@ export default function LoginScreen() {
         <TouchableOpacity
           style={styles.botonGoogle}
           onPress={iniciarSesionGoogle}
-          disabled={!request}
+          disabled={conectandoGoogle}
         >
           <Ionicons
             name="logo-google"

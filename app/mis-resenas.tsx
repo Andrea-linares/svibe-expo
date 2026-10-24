@@ -1,6 +1,7 @@
 import FormularioResena from "@/components/FormularioResena";
 import Toast from "@/components/Toast";
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { avisar, confirmar } from "@/lib/confirmar";
 import { editarResena, eliminarResena, MiResena, obtenerMisResenas } from "@/lib/foro";
 import { fechaForo } from "@/lib/foro-datos";
@@ -25,6 +26,7 @@ import {
 
 export default function MisResenasScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(55);
   const [resenas, setResenas] = useState<MiResena[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
@@ -82,7 +84,10 @@ export default function MisResenasScreen() {
 
   return (
     <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { marginTop: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={24} color={colores.texto} />
       </TouchableOpacity>
 

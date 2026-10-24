@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -15,9 +16,10 @@ export default function AdminHeader({
   accion?: React.ReactNode;
 }) {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(60);
 
   return (
-    <View style={styles.contenedor}>
+    <View style={[styles.contenedor, { paddingTop: margenSuperior }]}>
       <View style={styles.filaSuperior}>
         <View style={styles.filaTitulo}>
           {mostrarVolver && (
@@ -49,7 +51,7 @@ export default function AdminHeader({
 }
 
 const styles = StyleSheet.create({
-  contenedor: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 12 },
+  contenedor: { paddingHorizontal: 20, paddingBottom: 12 },
   filaSuperior: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 
 export default function RegistroScreen() {
+  const margenSuperior = useMargenSuperior(55);
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
@@ -80,11 +82,14 @@ export default function RegistroScreen() {
       />
       <View style={styles.overlay} />
 
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { top: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={26} color="#fff" />
       </TouchableOpacity>
 
-      <View style={styles.contenidoArriba}>
+      <View style={[styles.contenidoArriba, { paddingTop: margenSuperior + 35 }]}>
         <Text style={styles.logo}>
           S<Text style={styles.logoAcento}>V</Text>ibe
         </Text>
@@ -226,7 +231,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(10, 10, 30, 0.35)",
   },
   botonAtras: { position: "absolute", top: 55, left: 20, zIndex: 1 },
-  contenidoArriba: { paddingTop: 90, alignItems: "center", paddingBottom: 30 },
+  // paddingTop dinámico: 35 por debajo del botón de volver (90 en Android)
+  contenidoArriba: { alignItems: "center", paddingBottom: 30 },
   logo: { fontSize: 34, fontWeight: "bold", color: "#fff" },
   logoAcento: { color: "#5B9BD5" },
   subtitulo: {

@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { decode } from "base64-arraybuffer";
@@ -23,6 +24,7 @@ import {
 export default function EditarPerfilScreen() {
   // Tema global (el mismo que Perfil); esta pantalla solo lo lee
   const { colores, esOscuro } = useTema();
+  const margenSuperior = useMargenSuperior(55);
 
   // Barra de estado según el tema mientras la pantalla está enfocada.
   // Se aplica en el siguiente ciclo para que no la pise el "auto" que
@@ -205,7 +207,11 @@ export default function EditarPerfilScreen() {
         <View
           style={[
             styles.encabezado,
-            { backgroundColor: colores.encabezado, borderBottomColor: colores.borde },
+            {
+              backgroundColor: colores.encabezado,
+              borderBottomColor: colores.borde,
+              paddingTop: margenSuperior,
+            },
           ]}
         >
         <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Volver">

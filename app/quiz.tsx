@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { supabase } from "@/lib/supabase";
@@ -79,6 +80,9 @@ function limiteCategoria(nombre: string) {
 
 export default function QuizScreen() {
   const { colores } = useTema();
+
+  // Margen del encabezado: 45 como mínimo (Android igual) y bajo la barra de estado en iPhone
+  const margenSuperior = useMargenSuperior(45);
 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] =
@@ -1809,9 +1813,10 @@ export default function QuizScreen() {
         }
       >
         <View
-          style={
-            styles.encabezado
-          }
+          style={[
+            styles.encabezado,
+            { marginTop: margenSuperior },
+          ]}
         >
           <TouchableOpacity
             onPress={() =>
@@ -2030,9 +2035,10 @@ export default function QuizScreen() {
         }
       >
         <View
-          style={
-            styles.encabezado
-          }
+          style={[
+            styles.encabezado,
+            { marginTop: margenSuperior },
+          ]}
         >
           <TouchableOpacity
             onPress={
@@ -2283,9 +2289,10 @@ export default function QuizScreen() {
         }
       >
         <View
-          style={
-            styles.encabezado
-          }
+          style={[
+            styles.encabezado,
+            { marginTop: margenSuperior },
+          ]}
         >
           <TouchableOpacity
             onPress={
@@ -2632,9 +2639,10 @@ export default function QuizScreen() {
         }
       >
         <View
-          style={
-            styles.encabezado
-          }
+          style={[
+            styles.encabezado,
+            { marginTop: margenSuperior },
+          ]}
         >
           <TouchableOpacity
             onPress={

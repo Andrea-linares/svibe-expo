@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
@@ -20,6 +21,7 @@ type Categoria = {
 
 export default function PreferenciasScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(55);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -109,7 +111,12 @@ export default function PreferenciasScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
-        <View style={[styles.encabezado, { backgroundColor: colores.tarjeta }]}>
+        <View
+          style={[
+            styles.encabezado,
+            { backgroundColor: colores.tarjeta, paddingTop: margenSuperior },
+          ]}
+        >
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={colores.texto} />
           </TouchableOpacity>

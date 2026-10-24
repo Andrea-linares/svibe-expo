@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 
 export default function OlvidePasswordScreen() {
+  const margenSuperior = useMargenSuperior(55);
   const [correo, setCorreo] = useState("");
   const [cargando, setCargando] = useState(false);
 
@@ -82,7 +84,10 @@ export default function OlvidePasswordScreen() {
       />
       <View style={styles.overlay} />
 
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { top: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={26} color="#fff" />
       </TouchableOpacity>
 

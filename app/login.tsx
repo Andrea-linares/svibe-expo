@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -19,6 +20,7 @@ import * as WebBrowser from "expo-web-browser";
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
+  const margenSuperior = useMargenSuperior(55);
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
   const [mostrarContrasena, setMostrarContrasena] = useState(false);
@@ -130,7 +132,10 @@ export default function LoginScreen() {
       />
       <View style={styles.overlay} />
 
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { top: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={26} color="#fff" />
       </TouchableOpacity>
 

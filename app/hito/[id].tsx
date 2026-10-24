@@ -4,6 +4,7 @@ import Toast from "@/components/Toast";
 import { COLOR_FAVORITOS } from "@/constants/theme";
 import { COLORES, useTema } from "@/contexts/ThemeContext";
 import { useFavoritos } from "@/hooks/use-favoritos";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { Evento, obtenerEventosVigentes } from "@/lib/eventos";
@@ -112,6 +113,11 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
   const { colores, esOscuro } = useTema();
   const o = esOscuro ? crearEstilosOscuros(colores) : null;
+
+  // Galería y visor a pantalla completa: márgenes de siempre como mínimo
+  // (Android igual) y por debajo de la barra de estado en iPhone
+  const margenGaleria = useMargenSuperior(55);
+  const topCerrarFullscreen = useMargenSuperior(50);
 
   const { esFavorito, alternarFavorito } = useFavoritos();
   const [toastVisible, setToastVisible] = useState(false);
@@ -622,7 +628,13 @@ style={[styles.descripcionCard, o?.textoSecundario]}
         onRequestClose={() => setGaleriaAbierta(false)}
       >
         <View style={[styles.galeriaContenedor, o?.fondo]}>
-          <View style={[styles.galeriaEncabezado, o?.separador]}>
+          <View
+            style={[
+              styles.galeriaEncabezado,
+              { paddingTop: margenGaleria },
+              o?.separador,
+            ]}
+          >
             <TouchableOpacity onPress={() => setGaleriaAbierta(false)}>
               <Text style={[styles.galeriaVolver, o?.enlace]}>← Volver</Text>
             </TouchableOpacity>
@@ -671,7 +683,7 @@ style={[styles.descripcionCard, o?.textoSecundario]}
       >
         <View style={styles.fullscreenFondo}>
           <TouchableOpacity
-            style={styles.fullscreenCerrar}
+            style={[styles.fullscreenCerrar, { top: topCerrarFullscreen }]}
             onPress={() => setIndiceFullscreen(null)}
           >
             <Text style={styles.fullscreenCerrarTexto}>✕</Text>
@@ -939,7 +951,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 55,
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
@@ -982,7 +993,6 @@ const styles = StyleSheet.create({
   fullscreenFondo: { flex: 1, backgroundColor: "#000" },
   fullscreenCerrar: {
     position: "absolute",
-    top: 50,
     right: 20,
     zIndex: 10,
     width: 36,

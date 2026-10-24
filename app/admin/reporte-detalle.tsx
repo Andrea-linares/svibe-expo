@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -36,6 +37,7 @@ const ETIQUETAS_TIPO: Record<string, string> = {
 
 export default function AdminReporteDetalleScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(55);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [reporte, setReporte] = useState<Reporte | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -109,7 +111,10 @@ export default function AdminReporteDetalleScreen() {
       style={[styles.contenedor, { backgroundColor: colores.fondo }]}
       contentContainerStyle={{ paddingBottom: 60 }}
     >
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { marginTop: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={24} color={colores.texto} />
       </TouchableOpacity>
 

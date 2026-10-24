@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { decode } from "base64-arraybuffer";
@@ -30,6 +31,7 @@ const TIPOS = [
 
 export default function ReportarProblemaScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(60);
   const [verificandoSesion, setVerificandoSesion] = useState(true);
   const [usuarioId, setUsuarioId] = useState<string | null>(null);
 
@@ -190,7 +192,7 @@ export default function ReportarProblemaScreen() {
   return (
     <ScrollView
       style={[styles.contenedor, { backgroundColor: colores.fondo }]}
-      contentContainerStyle={{ padding: 20, paddingTop: 60, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: 20, paddingTop: margenSuperior, paddingBottom: 60 }}
     >
       <Text style={[styles.titulo, { color: colores.texto }]}>
         Reportar un problema

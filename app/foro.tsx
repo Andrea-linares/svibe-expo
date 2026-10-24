@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { obtenerResenasRecientes, ResenaReciente } from "@/lib/foro";
 import { fechaForo } from "@/lib/foro-datos";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,6 +27,7 @@ function pluralizar(cantidad: number, singular: string, plural: string) {
 
 export default function ForoScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(55);
   const [resenas, setResenas] = useState<ResenaReciente[]>([]);
   const [cargando, setCargando] = useState(true);
   const [refrescando, setRefrescando] = useState(false);
@@ -53,7 +55,10 @@ export default function ForoScreen() {
 
   return (
     <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { marginTop: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={24} color={colores.texto} />
       </TouchableOpacity>
 

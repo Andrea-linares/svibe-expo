@@ -1,5 +1,6 @@
 import TarjetaLugar, { LugarTarjeta } from "@/components/TarjetaLugar";
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import {
@@ -12,6 +13,7 @@ import {
 
 export default function OcultoScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(55);
   const [lugares, setLugares] = useState<LugarTarjeta[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -42,7 +44,12 @@ export default function OcultoScreen() {
       style={[styles.contenedor, { backgroundColor: colores.fondo }]}
       contentContainerStyle={styles.contenido}
     >
-      <Text style={[styles.tituloSeccion, { color: colores.texto }]}>
+      <Text
+        style={[
+          styles.tituloSeccion,
+          { color: colores.texto, marginTop: margenSuperior },
+        ]}
+      >
         Lugares ocultos
       </Text>
       <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>
@@ -66,7 +73,6 @@ const styles = StyleSheet.create({
   tituloSeccion: {
     fontSize: 22,
     fontWeight: "bold",
-    marginTop: 55,
     marginHorizontal: 16,
   },
   subtitulo: {

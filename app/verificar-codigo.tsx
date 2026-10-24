@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 
 export default function VerificarCodigoScreen() {
+  const margenSuperior = useMargenSuperior(55);
   const { correo, nombre } = useLocalSearchParams<{
     correo: string;
     nombre: string;
@@ -111,7 +113,10 @@ export default function VerificarCodigoScreen() {
       <View style={styles.overlay} />
 
       {/* Flecha para volver y corregir el correo, si se equivocó */}
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { top: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={26} color="#fff" />
       </TouchableOpacity>
 

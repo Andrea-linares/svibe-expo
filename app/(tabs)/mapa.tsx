@@ -1,15 +1,24 @@
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { ComponentRef, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
+
+// Posición superior actual del botón "Rutas cerca de mí" (se mantiene en Android)
+const TOP_BOTON = 16;
+// Separación entre la barra de estado y los elementos flotantes en iPhone
+const SEPARACION = 8;
+// Leaflet ya separa sus controles 10 px del borde superior
+const MARGEN_PROPIO_LEAFLET = 10;
 
 type HitoMapa = {
   id: string;
@@ -24,6 +33,30 @@ export default function MapaScreen() {
   const [hitos, setHitos] = useState<HitoMapa[]>([]);
   const [cargando, setCargando] = useState(true);
   const [seleccionado, setSeleccionado] = useState<HitoMapa | null>(null);
+  const webViewRef = useRef<ComponentRef<typeof WebView>>(null);
+  const insets = useSafeAreaInsets();
+
+  // El mapa ocupa toda la pantalla, también bajo la barra de estado.
+  // En iPhone los elementos flotantes de arriba se bajan por debajo del
+  // notch / Dynamic Island; en Android se mantienen exactamente igual.
+  const esIOS = Platform.OS === "ios";
+  const topBoton = esIOS
+    ? Math.max(TOP_BOTON, insets.top + SEPARACION)
+    : TOP_BOTON;
+  const topControlesLeaflet = esIOS
+    ? Math.max(0, insets.top + SEPARACION - MARGEN_PROPIO_LEAFLET)
+    : 0;
+
+  // Pasa el margen a los controles de zoom de Leaflet sin recargar el mapa
+  const aplicarMargenLeaflet = useCallback(() => {
+    webViewRef.current?.injectJavaScript(
+      `document.documentElement.style.setProperty('--margen-superior', '${topControlesLeaflet}px'); true;`,
+    );
+  }, [topControlesLeaflet]);
+
+  useEffect(() => {
+    aplicarMargenLeaflet();
+  }, [aplicarMargenLeaflet]);
 
   useEffect(() => {
     async function cargarUbicaciones() {
@@ -86,6 +119,8 @@ export default function MapaScreen() {
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
           html, body, #map { height: 100%; margin: 0; padding: 0; }
+          /* Margen superior de los controles (zoom), inyectado desde la app */
+          .leaflet-top { top: var(--margen-superior, 0px); }
         </style>
       </head>
       <body>
@@ -105,9 +140,11 @@ export default function MapaScreen() {
    return (
     <View style={{ flex: 1 }}>
       <WebView
+        ref={webViewRef}
         originWhitelist={["*"]}
         source={{ html }}
         style={styles.mapa}
+        onLoadEnd={aplicarMargenLeaflet}
         onMessage={(evento) => {
           const hitoId = evento.nativeEvent.data;
           const hito = hitos.find((h) => h.id === hitoId);
@@ -117,7 +154,7 @@ export default function MapaScreen() {
 
       {/* Botón flotante: ruta desde mi ubicación */}
       <TouchableOpacity
-        style={styles.botonCercaDeMi}
+        style={[styles.botonCercaDeMi, { top: topBoton }]}
         onPress={() => router.push("/rutas" as any)}
       >
         <Text style={styles.textoBotonRutas}>📍 Rutas cerca de mí</Text>
@@ -227,7 +264,6 @@ const styles = StyleSheet.create({
 textoBotonRutas: { color: "#5B9BD5", fontWeight: "600" },
 botonCercaDeMi: {
   position: "absolute",
-  top: 16,
   alignSelf: "center",
   backgroundColor: "#fff",
   borderRadius: 20,

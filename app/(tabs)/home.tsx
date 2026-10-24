@@ -2,6 +2,7 @@ import { BotonTema } from "@/components/BotonTema";
 import TarjetaLugar, { obtenerImagenPrincipal } from "@/components/TarjetaLugar";
 import { COLOR_ACENTO } from "@/constants/theme";
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { Evento, obtenerEventosDeHoy } from "@/lib/eventos";
 import { formatearHora, hoyLocal } from "@/lib/fechas";
 import { supabase } from "@/lib/supabase";
@@ -82,6 +83,11 @@ const CLAVE_AVISO_EVENTOS_CERRADO = "aviso_eventos_cerrado";
 
 export default function HomeScreen() {
   const { colores } = useTema();
+
+  // Márgenes superiores: los valores de siempre como mínimo (Android igual)
+  // y por debajo de la barra de estado en iPhone
+  const margenEncabezado = useMargenSuperior(55);
+  const margenMenu = useMargenSuperior(60);
 
   const [carrusel, setCarrusel] = useState<Hito[]>([]);
   const [imprescindibles, setImprescindibles] = useState<Hito[]>([]);
@@ -520,6 +526,7 @@ export default function HomeScreen() {
           styles.encabezado,
           {
             backgroundColor: colores.encabezado,
+            paddingTop: margenEncabezado,
           },
         ]}
       >
@@ -725,7 +732,10 @@ export default function HomeScreen() {
       >
         <View style={styles.fondoOscuro}>
           <View
-            style={[styles.panelMenu, { backgroundColor: colores.tarjeta }]}
+            style={[
+              styles.panelMenu,
+              { backgroundColor: colores.tarjeta, paddingTop: margenMenu },
+            ]}
           >
             {/* Encabezado con logo y botón cerrar */}
             <View style={styles.cabeceraMenu}>
@@ -1252,7 +1262,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 12,
-    paddingTop: 55,
     paddingBottom: 12,
     gap: 10,
   },
@@ -1442,7 +1451,6 @@ const styles = StyleSheet.create({
   panelMenu: {
     width: "80%",
     height: "100%",
-    paddingTop: 60,
     paddingHorizontal: 20,
   },
   cabeceraMenu: {

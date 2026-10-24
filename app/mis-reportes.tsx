@@ -11,6 +11,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useTema } from '@/contexts/ThemeContext';
+import { useMargenSuperior } from '@/hooks/use-margen-superior';
 
 type Reporte = {
   id: string;
@@ -30,6 +31,7 @@ const ETIQUETAS_TIPO: Record<string, string> = {
 
 export default function MisReportesScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(55);
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -65,7 +67,10 @@ export default function MisReportesScreen() {
 
   return (
     <View style={[styles.contenedor, { backgroundColor: colores.fondo }]}>
-      <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
+      <TouchableOpacity
+        style={[styles.botonAtras, { marginTop: margenSuperior }]}
+        onPress={() => router.back()}
+      >
         <Ionicons name="arrow-back" size={24} color={colores.texto} />
       </TouchableOpacity>
 

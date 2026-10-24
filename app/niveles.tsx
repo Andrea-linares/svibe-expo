@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { NIVELES } from "@/lib/niveles";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +24,10 @@ type Progreso = {
 
 export default function NivelesScreen() {
   const { colores } = useTema();
+
+  // Margen del encabezado: 45 como mínimo (Android igual) y bajo la barra de estado en iPhone
+  const margenSuperior =
+    useMargenSuperior(45);
 
   const [progreso, setProgreso] =
     useState<Progreso | null>(null);
@@ -253,7 +258,12 @@ export default function NivelesScreen() {
         />
       }
     >
-      <View style={styles.encabezado}>
+      <View
+        style={[
+          styles.encabezado,
+          { marginTop: margenSuperior },
+        ]}
+      >
         <TouchableOpacity
           onPress={() =>
             router.back()

@@ -1,4 +1,5 @@
 import { useTema } from "@/contexts/ThemeContext";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { decode } from "base64-arraybuffer";
@@ -25,6 +26,7 @@ type ImagenExistente = { id: number; url: string; orden: number };
 
 export default function HitoFormularioScreen() {
   const { colores } = useTema();
+  const margenSuperior = useMargenSuperior(60);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const esEdicion = !!id;
 
@@ -340,7 +342,7 @@ export default function HitoFormularioScreen() {
   return (
     <ScrollView
       style={[styles.contenedor, { backgroundColor: colores.fondo }]}
-      contentContainerStyle={{ padding: 20, paddingTop: 60, paddingBottom: 60 }}
+      contentContainerStyle={{ padding: 20, paddingTop: margenSuperior, paddingBottom: 60 }}
     >
       <Text style={[styles.titulo, { color: colores.texto }]}>
         {esEdicion ? "Editar lugar" : "Nuevo lugar"}

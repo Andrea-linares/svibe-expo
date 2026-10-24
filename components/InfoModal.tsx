@@ -1,3 +1,4 @@
+import { useTema } from "@/contexts/ThemeContext";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
@@ -13,6 +14,9 @@ export default function InfoModal({
   texto,
   onClose,
 }: Props) {
+  // En modo claro se mantienen los colores fijos de abajo
+  const { colores, esOscuro } = useTema();
+
   return (
     <Modal
       visible={visible}
@@ -27,15 +31,24 @@ export default function InfoModal({
           onPress={onClose}
         />
 
-        <View style={styles.modal}>
+        <View
+          style={[
+            styles.modal,
+            esOscuro && {
+              backgroundColor: colores.tarjeta,
+              borderTopWidth: 1,
+              borderColor: colores.borde,
+            },
+          ]}
+        >
 
-          <View style={styles.linea} />
+          <View style={[styles.linea, esOscuro && { backgroundColor: colores.borde }]} />
 
-          <Text style={styles.titulo}>
+          <Text style={[styles.titulo, esOscuro && { color: colores.texto }]}>
             {titulo}
           </Text>
 
-          <Text style={styles.texto}>
+          <Text style={[styles.texto, esOscuro && { color: colores.textoSecundario }]}>
             {texto}
           </Text>
 

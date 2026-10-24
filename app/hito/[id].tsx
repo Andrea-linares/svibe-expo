@@ -2,6 +2,7 @@ import SeccionResenas from "@/components/foro/SeccionResenas";
 import InfoModal from "@/components/InfoModal";
 import Toast from "@/components/Toast";
 import { COLOR_FAVORITOS } from "@/constants/theme";
+import { COLORES, useTema } from "@/contexts/ThemeContext";
 import { useFavoritos } from "@/hooks/use-favoritos";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { revisarYCompletarRetos } from "@/hooks/use-retos";
@@ -54,6 +55,37 @@ const { width: ANCHO_PANTALLA, height: ALTO_PANTALLA } = Dimensions.get("window"
 const ALTURA_CARRUSEL = 260;
 const MAX_IMAGENES_CARRUSEL = 5;
 
+// Verde de estado; en modo oscuro se aclara para mantener contraste
+const VERDE = "#2E7D32";
+const VERDE_OSCURO = "#81C784";
+
+// En modo claro se usan solo los estilos fijos de abajo; en modo oscuro
+// estos estilos se aplican encima con la paleta del tema (useTema)
+function crearEstilosOscuros(colores: typeof COLORES.oscuro) {
+  return StyleSheet.create({
+    fondo: { backgroundColor: colores.fondo },
+    texto: { color: colores.texto },
+    textoSecundario: { color: colores.textoSecundario },
+    tarjeta: {
+      backgroundColor: colores.tarjeta,
+      borderWidth: 1,
+      borderColor: colores.borde,
+    },
+    tarjetaVerde: {
+      backgroundColor: "#1B2B1D",
+      borderWidth: 1,
+      borderColor: "#2E4A31",
+    },
+    separador: { borderBottomColor: colores.borde },
+    enlace: { color: colores.acento },
+    enlaceVerde: { color: VERDE_OSCURO },
+    botonSecundario: {
+      backgroundColor: colores.tarjeta,
+      borderColor: colores.borde,
+    },
+  });
+}
+
 export default function DetalleHitoScreen() {
   // Recibimos el id que viene en la URL (ej: /hito/abc-123)
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -77,6 +109,9 @@ const [mostrarFeedback, setMostrarFeedback] = useState(false);
 const [feedbackEnviado, setFeedbackEnviado] = useState<
   "interesado" | "no_interesado" | null
 >(null);
+
+  const { colores, esOscuro } = useTema();
+  const o = esOscuro ? crearEstilosOscuros(colores) : null;
 
   const { esFavorito, alternarFavorito } = useFavoritos();
   const [toastVisible, setToastVisible] = useState(false);
@@ -204,7 +239,7 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
   if (cargando) {
     return (
-      <View style={styles.centrado}>
+      <View style={[styles.centrado, o?.fondo]}>
         <ActivityIndicator size="large" color="#5B8DB8" />
       </View>
     );
@@ -212,8 +247,8 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
   if (!hito) {
     return (
-      <View style={styles.centrado}>
-        <Text>No se encontró este lugar.</Text>
+      <View style={[styles.centrado, o?.fondo]}>
+        <Text style={o?.texto}>No se encontró este lugar.</Text>
       </View>
     );
   }
@@ -232,8 +267,8 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
   }
 
   return (
-    <View style={styles.contenedor}>
-    <ScrollView style={styles.contenedor}>
+    <View style={[styles.contenedor, o?.fondo]}>
+    <ScrollView style={[styles.contenedor, o?.fondo]}>
       <View>
       {/* bloque completo de imagen principal reemplazado por carrusel + botón de galería */}
       {imagenes.length > 0 ? (
@@ -311,18 +346,18 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
       <View style={styles.contenido}>
         {/* Título */}
-        <Text style={styles.titulo}>{hito.nombre}</Text>
+        <Text style={[styles.titulo, o?.texto]}>{hito.nombre}</Text>
 
         {/* Ubicación */}
         {hito.direccion_referencia && (
-          <Text style={styles.ubicacion}>📍 {hito.direccion_referencia}</Text>
+          <Text style={[styles.ubicacion, o?.textoSecundario]}>📍 {hito.direccion_referencia}</Text>
         )}
 
         {/* Descripción */}
         {hito.descripcion && (
   <>
     <Text
-      style={styles.descripcion}
+      style={[styles.descripcion, o?.texto]}
       numberOfLines={descripcionExpandida ? undefined : 4}
     >
       {hito.descripcion}
@@ -334,7 +369,7 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
           setDescripcionExpandida(!descripcionExpandida)
         }
       >
-        <Text style={styles.leerMas}>
+        <Text style={[styles.leerMas, o?.enlaceVerde]}>
           {descripcionExpandida ? "Leer menos" : "Leer más"}
         </Text>
       </TouchableOpacity>
@@ -344,19 +379,19 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
 {/* 🆕 CAMBIO: tarjeta de feedback contextual "¿Te interesó este hito?" */}
         {mostrarFeedback && !feedbackEnviado && (
-          <View style={styles.cardFeedback}>
+          <View style={[styles.cardFeedback, o?.tarjetaVerde]}>
             <View style={styles.filaFeedbackEncabezado}>
               <Text style={styles.iconoFeedback}>🌱</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.tituloFeedback}>
+                <Text style={[styles.tituloFeedback, o?.texto]}>
                   ¿Te interesó este hito?
                 </Text>
-                <Text style={styles.textoFeedback}>
+                <Text style={[styles.textoFeedback, o?.textoSecundario]}>
                   Tu opinión nos ayuda a mostrarte contenido que te guste más.
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setMostrarFeedback(false)}>
-                <Text style={styles.cerrarFeedback}>✕</Text>
+                <Text style={[styles.cerrarFeedback, o?.textoSecundario]}>✕</Text>
               </TouchableOpacity>
             </View>
 
@@ -370,18 +405,18 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.botonFeedbackNo}
+                style={[styles.botonFeedbackNo, o?.botonSecundario]}
                 onPress={() => enviarFeedback("no_interesado")}
               >
-                <Text style={styles.textoBotonFeedbackNo}>👎 No tanto</Text>
+                <Text style={[styles.textoBotonFeedbackNo, o?.texto]}>👎 No tanto</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
 
         {feedbackEnviado && (
-          <View style={styles.cardFeedbackEnviado}>
-            <Text style={styles.textoFeedbackEnviado}>
+          <View style={[styles.cardFeedbackEnviado, o?.tarjeta]}>
+            <Text style={[styles.textoFeedbackEnviado, o?.textoSecundario]}>
               {feedbackEnviado === "interesado"
                 ? "✅ Gracias, tomamos nota de tu interés."
                 : "Gracias por tu opinión."}
@@ -390,26 +425,30 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
         )}
 
         {/* Tarjeta de ESTADO (abierto/cerrado, calculado en tiempo real) */}
-        <View style={[styles.card, styles.cardEstado]}>
+        <View style={[styles.card, styles.cardEstado, o?.tarjetaVerde]}>
           <Text
             style={[
               styles.textoEstado,
-              { color: estado.abierto ? "#2E7D32" : "#D32F2F" },
+              {
+                color: estado.abierto
+                  ? esOscuro ? VERDE_OSCURO : VERDE
+                  : colores.peligro,
+              },
             ]}
           >
             {estado.abierto ? "Abierto hoy" : "Cerrado ahora"}
           </Text>
-          <Text style={styles.textoHora}>{estado.mensajeHora}</Text>
+          <Text style={[styles.textoHora, o?.textoSecundario]}>{estado.mensajeHora}</Text>
         </View>
 
         {/* Tarjeta de HORARIOS */}
         {horarios.length > 0 && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitulo}>Horarios de atención</Text>
+        <View style={[styles.card, o?.tarjeta]}>
+          <Text style={[styles.cardTitulo, o?.texto]}>Horarios de atención</Text>
           {formatearHorarios(horarios).map((item, index) => (
-        <View key={index} style={styles.filaHorario}>
-          <Text style={styles.horarioDia}>{item.rango}</Text>
-          <Text style={styles.horarioHora}>{item.horario}</Text>
+        <View key={index} style={[styles.filaHorario, o?.separador]}>
+          <Text style={[styles.horarioDia, o?.texto]}>{item.rango}</Text>
+          <Text style={[styles.horarioHora, o?.texto]}>{item.horario}</Text>
       </View>
     ))}
   </View>
@@ -418,7 +457,7 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
        {/* PRECIOS */}
 
 <TouchableOpacity
-    style={styles.card}
+    style={[styles.card, o?.tarjeta]}
     onPress={()=>{
         setTituloModal("Precios");
 
@@ -436,11 +475,11 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
 <View style={styles.opcion}>
 
-<Text style={styles.opcionTitulo}>
+<Text style={[styles.opcionTitulo, o?.texto]}>
 Precios de entrada
 </Text>
 
-<Text style={styles.flecha}>›</Text>
+<Text style={[styles.flecha, o?.textoSecundario]}>›</Text>
 
 </View>
 
@@ -449,7 +488,7 @@ Precios de entrada
 
 
 <Text
-style={styles.subtitulo}
+style={[styles.subtitulo, o?.texto]}
 >
 
 Información
@@ -468,7 +507,7 @@ contentContainerStyle={styles.carruselInfo}
 
 <TouchableOpacity
 
-style={styles.cardInfo}
+style={[styles.cardInfo, o?.tarjeta]}
 
 onPress={()=>{
 
@@ -482,20 +521,20 @@ setModalVisible(true);
 
 >
 
-<Text style={styles.tituloCard}>
+<Text style={[styles.tituloCard, o?.texto]}>
 Leyenda
 </Text>
 
 <Text
 numberOfLines={2}
-style={styles.descripcionCard}
+style={[styles.descripcionCard, o?.textoSecundario]}
 >
 
 Descubre la historia de este lugar.
 
 </Text>
 
-<Text style={styles.flechaCard}>
+<Text style={[styles.flechaCard, o?.textoSecundario]}>
 ›
 </Text>
 
@@ -507,7 +546,7 @@ Descubre la historia de este lugar.
 
 <TouchableOpacity
 
-style={styles.cardInfo}
+style={[styles.cardInfo, o?.tarjeta]}
 
 onPress={()=>{
 
@@ -521,20 +560,20 @@ setModalVisible(true);
 
 >
 
-<Text style={styles.tituloCard}>
+<Text style={[styles.tituloCard, o?.texto]}>
 Dato curioso
 </Text>
 
 <Text
 numberOfLines={2}
-style={styles.descripcionCard}
+style={[styles.descripcionCard, o?.textoSecundario]}
 >
 
 Conoce algo interesante.
 
 </Text>
 
-<Text style={styles.flechaCard}>
+<Text style={[styles.flechaCard, o?.textoSecundario]}>
 ›
 </Text>
 
@@ -546,26 +585,26 @@ Conoce algo interesante.
 
 <TouchableOpacity
 
-style={styles.cardInfo}
+style={[styles.cardInfo, o?.tarjeta]}
 
 onPress={() => router.push(`/eventos/hito/${hito.id}`)}
 
 >
 
-<Text style={styles.tituloCard}>
+<Text style={[styles.tituloCard, o?.texto]}>
 Eventos
 </Text>
 
 <Text
 numberOfLines={2}
-style={styles.descripcionCard}
+style={[styles.descripcionCard, o?.textoSecundario]}
 >
 
 {textoProximoEvento}
 
 </Text>
 
-<Text style={styles.flechaCard}>
+<Text style={[styles.flechaCard, o?.textoSecundario]}>
 ›
 </Text>
 
@@ -582,12 +621,12 @@ style={styles.descripcionCard}
         animationType="slide"
         onRequestClose={() => setGaleriaAbierta(false)}
       >
-        <View style={styles.galeriaContenedor}>
-          <View style={styles.galeriaEncabezado}>
+        <View style={[styles.galeriaContenedor, o?.fondo]}>
+          <View style={[styles.galeriaEncabezado, o?.separador]}>
             <TouchableOpacity onPress={() => setGaleriaAbierta(false)}>
-              <Text style={styles.galeriaVolver}>← Volver</Text>
+              <Text style={[styles.galeriaVolver, o?.enlace]}>← Volver</Text>
             </TouchableOpacity>
-            <Text style={styles.galeriaTitulo} numberOfLines={1}>
+            <Text style={[styles.galeriaTitulo, o?.texto]} numberOfLines={1}>
               {hito.nombre}
             </Text>
             <View style={{ width: 50 }} />

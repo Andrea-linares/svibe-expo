@@ -1,4 +1,5 @@
 import FormularioResena from "@/components/FormularioResena";
+import { COLORES, useTema } from "@/contexts/ThemeContext";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { avisar, confirmar } from "@/lib/confirmar";
 import {
@@ -25,11 +26,26 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "rea
  * - Cualquiera (también invitados) ve reseñas y comentarios.
  * - Con sesión: escribir reseña (S3-9), comentar, y editar o eliminar lo propio.
  * - Validación de 10–500 caracteres en FormularioResena y en el servidor (S3-10).
- * Colores fijos, igual que el resto del detalle del hito.
+ * Colores fijos en modo claro; en modo oscuro se usa la paleta de useTema,
+ * igual que el resto del detalle del hito.
  * ------------------------------------------------------------------------- */
 
+// Fondo del botón "Escribir reseña" (texto blanco): igual en ambos modos
 const ACENTO = "#3B6FA0";
-const ROJO = "#D32F2F";
+const GRIS_ICONO = "#777";
+
+function crearEstilosOscuros(colores: typeof COLORES.oscuro) {
+  return StyleSheet.create({
+    texto: { color: colores.texto },
+    textoSecundario: { color: colores.textoSecundario },
+    card: {
+      backgroundColor: colores.tarjeta,
+      borderWidth: 1,
+      borderColor: colores.borde,
+    },
+    comentario: { borderLeftColor: colores.borde },
+  });
+}
 
 type Formulario =
   | { tipo: "resena" }
@@ -121,6 +137,10 @@ function BotonIcono({
 }
 
 export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
+  const { colores, esOscuro } = useTema();
+  const o = esOscuro ? crearEstilosOscuros(colores) : null;
+  const colorIcono = esOscuro ? colores.textoSecundario : GRIS_ICONO;
+
   const [resenas, setResenas] = useState<ResenaPublica[]>([]);
   const [comentarios, setComentarios] = useState<Record<string, ComentarioPublico[]>>({});
   const [cargando, setCargando] = useState(true);
@@ -250,25 +270,27 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
 
   function renderComentario(comentario: ComentarioPublico) {
     return (
-      <View key={comentario.id} style={styles.comentario}>
+      <View key={comentario.id} style={[styles.comentario, o?.comentario]}>
         <View style={styles.filaAutor}>
-          <Text style={styles.autorComentario} numberOfLines={1}>
+          <Text style={[styles.autorComentario, o?.texto]} numberOfLines={1}>
             {comentario.autor}
             {comentario.es_mio ? " (tú)" : ""}
           </Text>
-          <Text style={styles.fecha}>{fechaForo(comentario.creado_en, comentario.editado_en)}</Text>
+          <Text style={[styles.fecha, o?.textoSecundario]}>
+            {fechaForo(comentario.creado_en, comentario.editado_en)}
+          </Text>
           {comentario.es_mio && (
             <>
               <BotonIcono
                 icono="pencil-outline"
-                color="#777"
+                color={colorIcono}
                 etiqueta="Editar comentario"
                 deshabilitado={ocupado}
                 onPress={() => setFormulario({ tipo: "editarComentario", comentario })}
               />
               <BotonIcono
                 icono="trash-outline"
-                color={ROJO}
+                color={colores.peligro}
                 etiqueta="Eliminar comentario"
                 cargando={eliminando === comentario.id}
                 deshabilitado={ocupado}
@@ -277,7 +299,7 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
             </>
           )}
         </View>
-        <Text style={styles.textoComentario}>{comentario.contenido}</Text>
+        <Text style={[styles.textoComentario, o?.textoSecundario]}>{comentario.contenido}</Text>
       </View>
     );
   }
@@ -285,25 +307,27 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
   function renderResena(resena: ResenaPublica) {
     const lista = comentarios[resena.id] ?? [];
     return (
-      <View key={resena.id} style={styles.card}>
+      <View key={resena.id} style={[styles.card, o?.card]}>
         <View style={styles.filaAutor}>
-          <Text style={styles.autor} numberOfLines={1}>
+          <Text style={[styles.autor, o?.texto]} numberOfLines={1}>
             {resena.autor}
             {resena.es_mia ? " (tú)" : ""}
           </Text>
-          <Text style={styles.fecha}>{fechaForo(resena.creado_en, resena.editado_en)}</Text>
+          <Text style={[styles.fecha, o?.textoSecundario]}>
+            {fechaForo(resena.creado_en, resena.editado_en)}
+          </Text>
           {resena.es_mia && (
             <>
               <BotonIcono
                 icono="pencil-outline"
-                color="#777"
+                color={colorIcono}
                 etiqueta="Editar reseña"
                 deshabilitado={ocupado}
                 onPress={() => setFormulario({ tipo: "editarResena", resena })}
               />
               <BotonIcono
                 icono="trash-outline"
-                color={ROJO}
+                color={colores.peligro}
                 etiqueta="Eliminar reseña"
                 cargando={eliminando === resena.id}
                 deshabilitado={ocupado}
@@ -312,7 +336,7 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
             </>
           )}
         </View>
-        <Text style={styles.texto}>{resena.contenido}</Text>
+        <Text style={[styles.texto, o?.texto]}>{resena.contenido}</Text>
 
         {lista.length > 0 && <View style={styles.listaComentarios}>{lista.map(renderComentario)}</View>}
 
@@ -321,8 +345,8 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
           onPress={() => abrir({ tipo: "comentario", resena }, "comentar")}
           disabled={ocupado}
         >
-          <Ionicons name="chatbubble-outline" size={15} color={ACENTO} />
-          <Text style={styles.textoComentar}>
+          <Ionicons name="chatbubble-outline" size={15} color={colores.acento} />
+          <Text style={[styles.textoComentar, { color: colores.acento }]}>
             Comentar{lista.length > 0 ? ` · ${lista.length}` : ""}
           </Text>
         </TouchableOpacity>
@@ -335,17 +359,17 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
     contenido = <ActivityIndicator color="#5B8DB8" style={{ marginVertical: 20 }} />;
   } else if (error) {
     contenido = (
-      <View style={styles.card}>
-        <Text style={styles.textoVacio}>No se pudieron cargar las reseñas.</Text>
+      <View style={[styles.card, o?.card]}>
+        <Text style={[styles.textoVacio, o?.textoSecundario]}>No se pudieron cargar las reseñas.</Text>
         <TouchableOpacity onPress={() => recargar(true)}>
-          <Text style={styles.reintentar}>Intentar de nuevo</Text>
+          <Text style={[styles.reintentar, { color: colores.acento }]}>Intentar de nuevo</Text>
         </TouchableOpacity>
       </View>
     );
   } else if (resenas.length === 0) {
     contenido = (
-      <View style={styles.card}>
-        <Text style={styles.textoVacio}>
+      <View style={[styles.card, o?.card]}>
+        <Text style={[styles.textoVacio, o?.textoSecundario]}>
           Todavía no hay reseñas. ¡Sé el primero en compartir tu experiencia!
         </Text>
       </View>
@@ -354,7 +378,7 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
     contenido = (
       <>
         {errorComentarios && (
-          <Text style={styles.avisoComentarios}>No se pudieron cargar los comentarios.</Text>
+          <Text style={[styles.avisoComentarios, o?.textoSecundario]}>No se pudieron cargar los comentarios.</Text>
         )}
         {resenas.map(renderResena)}
       </>
@@ -364,7 +388,7 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
   return (
     <View>
       <View style={styles.encabezado}>
-        <Text style={styles.titulo}>
+        <Text style={[styles.titulo, o?.texto]}>
           Reseñas{resenas.length > 0 ? ` (${resenas.length})` : ""}
         </Text>
         <TouchableOpacity
@@ -467,8 +491,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 4,
   },
-  textoComentar: { color: ACENTO, fontWeight: "600", fontSize: 13 },
+  textoComentar: { fontWeight: "600", fontSize: 13 },
   textoVacio: { fontSize: 14, color: "#666", textAlign: "center", lineHeight: 20 },
   avisoComentarios: { fontSize: 12.5, color: "#777", marginTop: 10 },
-  reintentar: { color: ACENTO, fontWeight: "600", textAlign: "center", marginTop: 10 },
+  reintentar: { fontWeight: "600", textAlign: "center", marginTop: 10 },
 });

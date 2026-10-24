@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  ImageBackground,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -120,13 +120,14 @@ export default function LoginScreen() {
   }
 
   return (
-    <ImageBackground
-      source={{
-        uri: "https://gdrrajvafwzgnbvjmqtw.supabase.co/storage/v1/object/public/hitos-imagenes/fondo.png",
-      }}
-      style={styles.fondo}
-      resizeMode="cover"
-    >
+    <View style={styles.fondo}>
+      <Image
+        source={{
+          uri: "https://gdrrajvafwzgnbvjmqtw.supabase.co/storage/v1/object/public/hitos-imagenes/fondo.png",
+        }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
       <View style={styles.overlay} />
 
       <TouchableOpacity style={styles.botonAtras} onPress={() => router.back()}>
@@ -221,7 +222,7 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 

@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  ImageBackground,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -100,13 +100,14 @@ export default function VerificarCodigoScreen() {
   }
 
   return (
-    <ImageBackground
-      source={{
-        uri: "https://gdrrajvafwzgnbvjmqtw.supabase.co/storage/v1/object/public/hitos-imagenes/fondo.png",
-      }}
-      style={styles.fondo}
-      resizeMode="cover"
-    >
+    <View style={styles.fondo}>
+      <Image
+        source={{
+          uri: "https://gdrrajvafwzgnbvjmqtw.supabase.co/storage/v1/object/public/hitos-imagenes/fondo.png",
+        }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
       <View style={styles.overlay} />
 
       {/* Flecha para volver y corregir el correo, si se equivocó */}
@@ -148,7 +149,7 @@ export default function VerificarCodigoScreen() {
           <Text style={styles.reenviar}>¿No te llegó? Reenviar código</Text>
         </TouchableOpacity>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 

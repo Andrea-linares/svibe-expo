@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import {
   ActivityIndicator,
-  ImageBackground,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -74,13 +74,14 @@ export default function BienvenidaScreen() {
   }
 
   return (
-    <ImageBackground
-      source={{
-        uri: "https://gdrrajvafwzgnbvjmqtw.supabase.co/storage/v1/object/public/hitos-imagenes/fondo.png",
-      }}
-      style={styles.fondo}
-      resizeMode="cover"
-    >
+    <View style={styles.fondo}>
+      <Image
+        source={{
+          uri: "https://gdrrajvafwzgnbvjmqtw.supabase.co/storage/v1/object/public/hitos-imagenes/fondo.png",
+        }}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
       {/* Capa oscura semitransparente para quenele el texto se lea bien sobre la foto */}
       <View style={styles.overlay} />
 
@@ -118,7 +119,7 @@ export default function BienvenidaScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 

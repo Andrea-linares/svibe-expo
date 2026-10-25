@@ -9,6 +9,13 @@ import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { Evento, obtenerEventosVigentes } from "@/lib/eventos";
 import { formatearHora, partesFecha } from "@/lib/fechas";
+import {
+  calcularEstado,
+  colorEstado,
+  EstadoManual,
+  Horario,
+  VERDE_OSCURO,
+} from "@/lib/horarios";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -37,12 +44,7 @@ type Hito = {
   direccion_referencia: string | null;
   precio: number | null;
   precio_texto: string | null;
-};
-
-type Horario = {
-  dia_semana: number; // 0=domingo ... 6=sábado
-  hora_apertura: string; // "08:00:00"
-  hora_cierre: string;
+  estado_manual: EstadoManual | null;
 };
 
 type ImagenHito = {
@@ -55,10 +57,6 @@ type ImagenHito = {
 const { width: ANCHO_PANTALLA, height: ALTO_PANTALLA } = Dimensions.get("window");
 const ALTURA_CARRUSEL = 260;
 const MAX_IMAGENES_CARRUSEL = 5;
-
-// Verde de estado; en modo oscuro se aclara para mantener contraste
-const VERDE = "#2E7D32";
-const VERDE_OSCURO = "#81C784";
 
 // En modo claro se usan solo los estilos fijos de abajo; en modo oscuro
 // estos estilos se aplican encima con la paleta del tema (useTema)
@@ -96,12 +94,6 @@ function describirProximoEvento(evento: Evento | null) {
   const { dia, mesCorto } = partesFecha(evento.fecha);
   const hora = evento.hora ? `, ${formatearHora(evento.hora)}` : "";
   return `${evento.titulo} · ${dia} ${mesCorto}${hora}`;
-}
-
-// Color del texto "Abierto hoy" / "Cerrado ahora"
-function colorEstado(abierto: boolean, esOscuro: boolean, colorCerrado: string) {
-  if (!abierto) return colorCerrado;
-  return esOscuro ? VERDE_OSCURO : VERDE;
 }
 
 // Descripción del lugar con "Leer más" / "Leer menos" si es larga
@@ -278,6 +270,8 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
         .from("hito_imagenes")
         .select("url, orden, anio, descripcion")
         .eq("hito_id", id)
+        // Las fotos antes/después son de la realidad aumentada, no del carrusel
+        .eq("tipo", "galeria")
         .order("orden", { ascending: true });
 
       setHito(hitoData);
@@ -368,7 +362,7 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
     );
   }
 
-  const estado = calcularEstado(horarios);
+  const estado = calcularEstado(horarios, hito.estado_manual);
 
   const imagenesCarrusel = imagenes.slice(0, MAX_IMAGENES_CARRUSEL);
   const favorito = esFavorito(hito.id);
@@ -800,33 +794,6 @@ style={[styles.descripcionCard, o?.textoSecundario]}
   );
 }
 
-
-// ---- Lógica de abierto/cerrado (equivalente a tu Calendar.getInstance() de Kotlin) ----
-function calcularEstado(horarios: Horario[]) {
-  const ahora = new Date();
-  const diaActual = ahora.getDay(); // 0=domingo ... 6=sábado (igual que en tu BD)
-  const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
-
-  const horarioHoy = horarios.find((h) => h.dia_semana === diaActual);
-
-  if (!horarioHoy) {
-    return { abierto: false, mensajeHora: "Cerrado hoy" };
-  }
-
-  const [horaA, minA] = horarioHoy.hora_apertura.split(":").map(Number);
-  const [horaC, minC] = horarioHoy.hora_cierre.split(":").map(Number);
-  const apertura = horaA * 60 + minA;
-  const cierre = horaC * 60 + minC;
-
-  const abierto = minutosActuales >= apertura && minutosActuales < cierre;
-
-  return {
-    abierto,
-    mensajeHora: abierto
-      ? `Cierra a las ${formatearHora(horarioHoy.hora_cierre)}`
-      : `Abre a las ${formatearHora(horarioHoy.hora_apertura)}`,
-  };
-}
 
 function nombreDia(dia: number) {
   const dias = [

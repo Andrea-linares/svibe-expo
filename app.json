@@ -8,7 +8,13 @@
     "scheme": "svibe",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "SVibe usa la cámara para mostrarte la realidad aumentada de los hitos históricos.",
+        "NSLocationWhenInUseUsageDescription": "SVibe usa tu ubicación para encontrar hitos históricos cercanos.",
+        "NSPhotoLibraryUsageDescription": "SVibe necesita acceso a tus fotos para que puedas elegir imágenes de los hitos y de tu perfil.",
+        "NSPhotoLibraryAddUsageDescription": "SVibe guarda en tus fotos las capturas de la realidad aumentada."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,7 +48,27 @@
       "expo-web-browser",
       "expo-font",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "SVibe usa la cámara para mostrarte la realidad aumentada de los hitos históricos.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SVibe usa tu ubicación para encontrar hitos históricos cercanos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SVibe necesita acceso a tus fotos para que puedas elegir imágenes de los hitos y de tu perfil."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

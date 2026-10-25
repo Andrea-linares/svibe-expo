@@ -1,8 +1,9 @@
+import StatCard from "@/components/admin/StatCard";
 import { ESPACIADO_PANEL, useTema } from "@/contexts/ThemeContext";
 import { hoyLocal, MESES } from "@/lib/fechas";
+import { contarHitosRA } from "@/lib/ra-servicio";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -35,12 +36,13 @@ export default function AdminDashboardScreen() {
   const [totalReportes, setTotalReportes] = useState(0);
   const [totalEventos, setTotalEventos] = useState(0);
   const [totalForo, setTotalForo] = useState(0);
+  const [totalRA, setTotalRA] = useState(0);
   const [menuVisible, setMenuVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       async function cargar() {
-        const [usuarios, hitos, reportes, eventos, resenas, comentarios] =
+        const [usuarios, hitos, reportes, eventos, resenas, comentarios, hitosRA] =
           await Promise.all([
           supabase.from("perfiles").select("*", { count: "exact", head: true }),
           supabase.from("hitos").select("*", { count: "exact", head: true }),
@@ -58,6 +60,8 @@ export default function AdminDashboardScreen() {
           supabase
             .from("foro_comentarios")
             .select("*", { count: "exact", head: true }),
+          // Hitos con RA = ar_activo verdadero
+          contarHitosRA(),
         ]);
 
         setTotalUsuarios(usuarios.count ?? 0);
@@ -65,6 +69,7 @@ export default function AdminDashboardScreen() {
         setTotalReportes(reportes.count ?? 0);
         setTotalEventos(eventos.count ?? 0);
         setTotalForo((resenas.count ?? 0) + (comentarios.count ?? 0));
+        setTotalRA(hitosRA.count ?? 0);
         setCargando(false);
       }
       cargar();
@@ -190,7 +195,7 @@ export default function AdminDashboardScreen() {
 
         {/* Estadísticas */}
         <View style={styles.grid}>
-          <TarjetaResumen
+          <StatCard
             icono="people"
             colorAcento={colores.panelAzul}
             numero={totalUsuarios}
@@ -199,7 +204,7 @@ export default function AdminDashboardScreen() {
             estiloTarjeta={estiloTarjeta}
             onPress={() => router.push("/admin/usuarios")}
           />
-          <TarjetaResumen
+          <StatCard
             icono="library"
             colorAcento={colores.panelDorado}
             numero={totalHitos}
@@ -208,7 +213,7 @@ export default function AdminDashboardScreen() {
             estiloTarjeta={estiloTarjeta}
             onPress={() => router.push("/admin/hitos")}
           />
-          <TarjetaResumen
+          <StatCard
             icono="alert"
             colorAcento={colores.panelRosa}
             numero={totalReportes}
@@ -217,7 +222,7 @@ export default function AdminDashboardScreen() {
             estiloTarjeta={estiloTarjeta}
             onPress={() => router.push("/admin/reportes")}
           />
-          <TarjetaResumen
+          <StatCard
             icono="calendar"
             colorAcento={colores.panelAzul}
             numero={totalEventos}
@@ -226,34 +231,25 @@ export default function AdminDashboardScreen() {
             estiloTarjeta={estiloTarjeta}
             onPress={() => router.push("/admin/eventos")}
           />
-          <TarjetaResumen
+          <StatCard
             icono="chatbubbles"
             colorAcento={colores.panelMorado}
             numero={totalForo}
             etiqueta="Publicaciones del foro"
             colores={colores}
             estiloTarjeta={estiloTarjeta}
-            anchoCompleto
             onPress={() => router.push("/admin/foro")}
           />
+          <StatCard
+            icono="scan"
+            colorAcento={colores.acentoRA}
+            numero={totalRA}
+            etiqueta="Hitos con RA"
+            colores={colores}
+            estiloTarjeta={estiloTarjeta}
+            onPress={() => router.push("/admin/ra")}
+          />
         </View>
-
-        {/* Agregar nuevo hito */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => router.push("/admin/hito-formulario")}
-        >
-          <LinearGradient
-            colors={[colores.panelAzul, colores.panelAzulDegradado]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.botonPrincipal}
-          >
-            <Ionicons name="add-circle-outline" size={34} color="#fff" />
-            <Text style={styles.textoBotonPrincipal}>Agregar nuevo hito</Text>
-            <Ionicons name="chevron-forward" size={22} color="#fff" />
-          </LinearGradient>
-        </TouchableOpacity>
 
         {/* Actividad reciente */}
         <View style={styles.encabezadoSeccion}>
@@ -412,98 +408,6 @@ export default function AdminDashboardScreen() {
   );
 }
 
-function TarjetaResumen({
-  icono,
-  colorAcento,
-  numero,
-  etiqueta,
-  colores,
-  estiloTarjeta,
-  anchoCompleto = false,
-  onPress,
-}: {
-  icono: any;
-  colorAcento: string;
-  numero: number;
-  etiqueta: string;
-  colores: Colores;
-  estiloTarjeta: object;
-  anchoCompleto?: boolean;
-  onPress: () => void;
-}) {
-  const circulo = (
-    <View
-      style={[
-        styles.circuloIcono,
-        styles.circuloGrande,
-        { backgroundColor: colorAcento },
-      ]}
-    >
-      <Ionicons name={icono} size={22} color="#fff" />
-    </View>
-  );
-  const textoNumero = (
-    <Text
-      style={[styles.numero, { color: colores.panelTexto }]}
-      numberOfLines={1}
-      adjustsFontSizeToFit
-    >
-      {numero}
-    </Text>
-  );
-  // Una sola línea; se achica un poco si no cabe en vez de cortarse
-  const textoEtiqueta = (
-    <Text
-      style={[styles.etiqueta, { color: colores.panelTextoSecundario }]}
-      numberOfLines={1}
-      adjustsFontSizeToFit
-      minimumFontScale={0.8}
-    >
-      {etiqueta}
-    </Text>
-  );
-  const flecha = (
-    <Ionicons
-      name="chevron-forward"
-      size={16}
-      color={colores.panelTextoSecundario}
-    />
-  );
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.tarjeta,
-        anchoCompleto && styles.tarjetaAnchoCompleto,
-        estiloTarjeta,
-      ]}
-      onPress={onPress}
-    >
-      {anchoCompleto ? (
-        <View style={styles.filaTarjeta}>
-          {circulo}
-          <View style={styles.textosTarjeta}>
-            {textoNumero}
-            {textoEtiqueta}
-          </View>
-          {flecha}
-        </View>
-      ) : (
-        <>
-          {/* En media tarjeta la etiqueta usa todo el ancho para caber en una línea */}
-          <View style={styles.filaTarjeta}>
-            {circulo}
-            <View style={styles.textosTarjeta}>{textoNumero}</View>
-            {flecha}
-          </View>
-          {textoEtiqueta}
-        </>
-      )}
-      <View style={[styles.lineaInferior, { backgroundColor: colorAcento }]} />
-    </TouchableOpacity>
-  );
-}
-
 // Silueta decorativa: montañas y edificio histórico con torre de reloj
 function Ilustracion({ colores, top }: { colores: Colores; top: number }) {
   return (
@@ -593,52 +497,12 @@ const styles = StyleSheet.create({
     rowGap: E.separacion,
     marginTop: 22,
   },
-  tarjeta: {
-    width: "48.5%",
-    gap: 8,
-    borderRadius: E.radioTarjeta,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingTop: 16,
-    paddingBottom: 16 + E.grosorLinea,
-    overflow: "hidden",
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-  },
-  lineaInferior: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: E.grosorLinea,
-  },
   circuloIcono: {
     width: 38,
     height: 38,
     borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
-  },
-  tarjetaAnchoCompleto: { width: "100%" },
-  filaTarjeta: { flexDirection: "row", alignItems: "center", gap: 10 },
-  textosTarjeta: { flex: 1 },
-  numero: { fontSize: 24, fontWeight: "bold" },
-  circuloGrande: { width: 44, height: 44, borderRadius: 22 },
-  etiqueta: { fontSize: 13 },
-  botonPrincipal: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: E.radioBoton,
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-    marginTop: E.separacion + 8,
-  },
-  textoBotonPrincipal: {
-    flex: 1,
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
   },
   encabezadoSeccion: {
     flexDirection: "row",

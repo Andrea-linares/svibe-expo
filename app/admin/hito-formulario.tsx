@@ -87,6 +87,8 @@ export default function HitoFormularioScreen() {
           .from("hito_imagenes")
           .select("id, url, orden")
           .eq("hito_id", id)
+          // Las fotos antes/después se gestionan en el editor de RA
+          .eq("tipo", "galeria")
           .order("orden", { ascending: true });
         setImagenesExistentes(imagenesData ?? []);
 
@@ -347,6 +349,19 @@ export default function HitoFormularioScreen() {
       <Text style={[styles.titulo, { color: colores.texto }]}>
         {esEdicion ? "Editar lugar" : "Nuevo lugar"}
       </Text>
+
+      {esEdicion && (
+        <TouchableOpacity
+          style={[styles.botonRA, { borderColor: colores.acentoRA }]}
+          onPress={() => router.push(`/admin/ra/${id}`)}
+        >
+          <Ionicons name="scan-outline" size={20} color={colores.acentoRA} />
+          <Text style={[styles.textoBotonRA, { color: colores.acentoRA }]}>
+            Configurar RA
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colores.acentoRA} />
+        </TouchableOpacity>
+      )}
 
       {/* Selector de imágenes múltiple */}
       <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>
@@ -641,6 +656,17 @@ const styles = StyleSheet.create({
   contenedor: { flex: 1 },
   centrado: { flex: 1, justifyContent: "center", alignItems: "center" },
   titulo: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
+  botonRA: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  textoBotonRA: { flex: 1, fontSize: 15, fontWeight: "600" },
   etiqueta: { fontSize: 13, fontWeight: "600", marginBottom: 6, marginTop: 4 },
   input: {
     borderWidth: 1,

@@ -18,6 +18,8 @@ export const COLORES = {
     borde: "#E0E0E0",
     acento: "#3B6FA0",
     peligro: "#D32F2F",
+    // Realidad aumentada (verde azulado), en la zona de usuario y en el panel
+    acentoRA: "#0E8C80",
     // Panel de administración
     panelFondo: "#F4F7FB",
     panelTarjeta: "#FFFFFF",
@@ -48,6 +50,7 @@ export const COLORES = {
     // Acento y peligro aclarados para mantener contraste sobre fondos oscuros
     acento: "#7FB0E0",
     peligro: "#FF6B6B",
+    acentoRA: "#3CC4B4",
     // Panel de administración
     panelFondo: "#0B1220",
     panelTarjeta: "#121C30",
@@ -82,6 +85,15 @@ export const ESPACIADO_PANEL = {
   margenInferiorBarra: 12,
   grosorLinea: 4,
 };
+
+// Color del tema con transparencia: conAlfa(colores.tarjeta, 0.7)
+// Sirve para paneles sobre la cámara sin inventar colores nuevos.
+export function conAlfa(hex: string, alfa: number) {
+  const canal = Math.round(Math.min(1, Math.max(0, alfa)) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `${hex.slice(0, 7)}${canal}`;
+}
 
 type TemaContextType = {
   esOscuro: boolean;

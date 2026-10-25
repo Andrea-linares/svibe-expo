@@ -40,7 +40,7 @@ function colorDeInsignia(id: number | string): string {
     indice = Math.abs(id);
   } else {
     indice = 0;
-    for (let i = 0; i < id.length; i++) indice = (indice * 31 + id.charCodeAt(i)) >>> 0;
+    for (let i = 0; i < id.length; i++) indice = (indice * 31 + (id.codePointAt(i) ?? 0)) >>> 0;
   }
   return PALETA_INSIGNIAS[indice % PALETA_INSIGNIAS.length];
 }

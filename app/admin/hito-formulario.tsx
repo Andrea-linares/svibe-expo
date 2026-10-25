@@ -297,11 +297,11 @@ export default function HitoFormularioScreen() {
       p_eventos_info: eventosInfo.trim() || null,
       p_direccion_referencia: direccionReferencia.trim() || null,
       p_categoria_id: categoriaId,
-      p_precio: parseFloat(precio) || 0,
+      p_precio: Number.parseFloat(precio) || 0,
       p_precio_texto: precioTexto.trim() || null,
       p_es_lugar_oculto: esLugarOculto,
-      p_lat: parseFloat(lat),
-      p_lng: parseFloat(lng),
+      p_lat: Number.parseFloat(lat),
+      p_lng: Number.parseFloat(lng),
     });
 
     if (error) {

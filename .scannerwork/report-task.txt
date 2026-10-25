@@ -2,5 +2,5 @@ projectKey=Svibe
 serverUrl=http://localhost:9000
 serverVersion=26.9.0.129388
 dashboardUrl=http://localhost:9000/dashboard?id=Svibe
-ceTaskId=04d2e08a-2fbd-45ab-bf59-34c3e49648e2
-ceTaskUrl=http://localhost:9000/api/ce/task?id=04d2e08a-2fbd-45ab-bf59-34c3e49648e2
+ceTaskId=7e8f2db5-ff2c-4c4a-a20b-ecfc388e5934
+ceTaskUrl=http://localhost:9000/api/ce/task?id=7e8f2db5-ff2c-4c4a-a20b-ecfc388e5934

@@ -44,8 +44,24 @@ function colorDeReto(id: number): string {
 }
 
 // 1250 -> "1,250" (sin depender de Intl, que no siempre está en Android)
+// Agrupa la parte entera de 3 en 3 desde la derecha con un bucle, sin regex,
+// para evitar el backtracking de /\B(?=(\d{3})+(?!\d))/ (regla S5852).
 function formatearPuntos(puntos: number): string {
-  return String(puntos).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const texto = String(puntos);
+  if (!Number.isFinite(puntos)) return texto; // NaN, Infinity: sin cambios
+
+  const signo = texto.startsWith("-") ? "-" : "";
+  const sinSigno = texto.slice(signo.length);
+  const indicePunto = sinSigno.indexOf(".");
+  const entero = indicePunto === -1 ? sinSigno : sinSigno.slice(0, indicePunto);
+  const decimales = indicePunto === -1 ? "" : sinSigno.slice(indicePunto);
+
+  let agrupado = "";
+  for (let fin = entero.length; fin > 0; fin -= 3) {
+    const grupo = entero.slice(Math.max(0, fin - 3), fin);
+    agrupado = agrupado ? `${grupo},${agrupado}` : grupo;
+  }
+  return signo + agrupado + decimales;
 }
 
 // Colores propios de esta pantalla que el tema global no trae

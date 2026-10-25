@@ -107,6 +107,54 @@ async function revisarInsignias(usuarioId: string) {
   }
 }
 
+type TextosFormulario = {
+  titulo: string;
+  subtitulo: string;
+  textoInicial: string;
+  textoBoton: string;
+  placeholder: string | undefined;
+};
+
+const PLACEHOLDER_COMENTARIO = "Escribe tu comentario...";
+
+// Textos del formulario según lo que se está escribiendo o editando
+function textosFormulario(formulario: Formulario, nombreHito: string): TextosFormulario {
+  switch (formulario.tipo) {
+    case "resena":
+      return {
+        titulo: "Escribir reseña",
+        subtitulo: nombreHito,
+        textoInicial: "",
+        textoBoton: "Publicar",
+        placeholder: undefined,
+      };
+    case "editarResena":
+      return {
+        titulo: "Editar reseña",
+        subtitulo: nombreHito,
+        textoInicial: formulario.resena.contenido,
+        textoBoton: "Guardar cambios",
+        placeholder: undefined,
+      };
+    case "comentario":
+      return {
+        titulo: "Comentar reseña",
+        subtitulo: `Respuesta a ${formulario.resena.autor}`,
+        textoInicial: "",
+        textoBoton: "Publicar",
+        placeholder: PLACEHOLDER_COMENTARIO,
+      };
+    case "editarComentario":
+      return {
+        titulo: "Editar comentario",
+        subtitulo: nombreHito,
+        textoInicial: formulario.comentario.contenido,
+        textoBoton: "Guardar cambios",
+        placeholder: PLACEHOLDER_COMENTARIO,
+      };
+  }
+}
+
 function BotonIcono({
   icono,
   color,
@@ -354,28 +402,34 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
     );
   }
 
-  let contenido;
-  if (cargando) {
-    contenido = <ActivityIndicator color="#5B8DB8" style={{ marginVertical: 20 }} />;
-  } else if (error) {
-    contenido = (
-      <View style={[styles.card, o?.card]}>
-        <Text style={[styles.textoVacio, o?.textoSecundario]}>No se pudieron cargar las reseñas.</Text>
-        <TouchableOpacity onPress={() => recargar(true)}>
-          <Text style={[styles.reintentar, { color: colores.acento }]}>Intentar de nuevo</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  } else if (resenas.length === 0) {
-    contenido = (
-      <View style={[styles.card, o?.card]}>
-        <Text style={[styles.textoVacio, o?.textoSecundario]}>
-          Todavía no hay reseñas. ¡Sé el primero en compartir tu experiencia!
-        </Text>
-      </View>
-    );
-  } else {
-    contenido = (
+  // Cargando, error, sin reseñas o la lista de reseñas
+  function renderContenido() {
+    if (cargando) {
+      return <ActivityIndicator color="#5B8DB8" style={{ marginVertical: 20 }} />;
+    }
+
+    if (error) {
+      return (
+        <View style={[styles.card, o?.card]}>
+          <Text style={[styles.textoVacio, o?.textoSecundario]}>No se pudieron cargar las reseñas.</Text>
+          <TouchableOpacity onPress={() => recargar(true)}>
+            <Text style={[styles.reintentar, { color: colores.acento }]}>Intentar de nuevo</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (resenas.length === 0) {
+      return (
+        <View style={[styles.card, o?.card]}>
+          <Text style={[styles.textoVacio, o?.textoSecundario]}>
+            Todavía no hay reseñas. ¡Sé el primero en compartir tu experiencia!
+          </Text>
+        </View>
+      );
+    }
+
+    return (
       <>
         {errorComentarios && (
           <Text style={[styles.avisoComentarios, o?.textoSecundario]}>No se pudieron cargar los comentarios.</Text>
@@ -385,11 +439,14 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
     );
   }
 
+  const textos = formulario ? textosFormulario(formulario, nombreHito) : null;
+  const totalResenas = resenas.length > 0 ? ` (${resenas.length})` : "";
+
   return (
     <View>
       <View style={styles.encabezado}>
         <Text style={[styles.titulo, o?.texto]}>
-          Reseñas{resenas.length > 0 ? ` (${resenas.length})` : ""}
+          Reseñas{totalResenas}
         </Text>
         <TouchableOpacity
           style={styles.botonEscribir}
@@ -401,35 +458,15 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
         </TouchableOpacity>
       </View>
 
-      {contenido}
+      {renderContenido()}
 
-      {formulario && (
+      {textos && (
         <FormularioResena
-          titulo={
-            formulario.tipo === "resena"
-              ? "Escribir reseña"
-              : formulario.tipo === "editarResena"
-                ? "Editar reseña"
-                : formulario.tipo === "comentario"
-                  ? "Comentar reseña"
-                  : "Editar comentario"
-          }
-          subtitulo={
-            formulario.tipo === "comentario" ? `Respuesta a ${formulario.resena.autor}` : nombreHito
-          }
-          textoInicial={
-            formulario.tipo === "editarResena"
-              ? formulario.resena.contenido
-              : formulario.tipo === "editarComentario"
-                ? formulario.comentario.contenido
-                : ""
-          }
-          textoBoton={formulario.tipo.startsWith("editar") ? "Guardar cambios" : "Publicar"}
-          placeholder={
-            formulario.tipo === "comentario" || formulario.tipo === "editarComentario"
-              ? "Escribe tu comentario..."
-              : undefined
-          }
+          titulo={textos.titulo}
+          subtitulo={textos.subtitulo}
+          textoInicial={textos.textoInicial}
+          textoBoton={textos.textoBoton}
+          placeholder={textos.placeholder}
           onGuardar={guardar}
           onCerrar={() => setFormulario(null)}
         />

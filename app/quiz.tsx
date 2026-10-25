@@ -1,6 +1,6 @@
 import { useTema } from "@/contexts/ThemeContext";
-import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
+import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
@@ -1143,7 +1143,7 @@ export default function QuizScreen() {
   function limpiarFrase(
     texto: string
   ): string {
-    return texto
+    const sinInicio = texto
       .replace(
         /\s+/g,
         " "
@@ -1155,12 +1155,41 @@ export default function QuizScreen() {
       .replace(
         /^[,;:\s]+/,
         ""
-      )
-      .replace(
-        /[,;:\s]+$/,
-        ""
-      )
-      .trim();
+      );
+
+    // Antes: .replace(/[,;:\s]+$/, "") — vulnerable a backtracking (S5852)
+    return quitarSeparadoresFinales(
+      sinInicio
+    ).trim();
+  }
+
+  /*
+   * Quita del final las comas, punto y coma, dos puntos y espacios
+   * recorriendo el texto desde el final, sin regex (tiempo lineal).
+   * c.trim() === "" reconoce los mismos espacios que \s.
+   */
+  function esSeparadorFinal(
+    caracter: string
+  ) {
+    return (
+      ",;:".includes(caracter) ||
+      caracter.trim() === ""
+    );
+  }
+
+  function quitarSeparadoresFinales(
+    texto: string
+  ) {
+    let fin = texto.length;
+
+    while (
+      fin > 0 &&
+      esSeparadorFinal(texto[fin - 1])
+    ) {
+      fin--;
+    }
+
+    return texto.slice(0, fin);
   }
 
   function limpiarTexto(
@@ -1519,8 +1548,7 @@ export default function QuizScreen() {
         }
 
         await actualizarProgreso(
-          sesion.user.id,
-          puntos
+          sesion.user.id
         );
         const nuevasInsignias = await verificarYDesbloquearInsignias(sesion.user.id);
         if (nuevasInsignias.length > 0) {
@@ -1566,9 +1594,10 @@ export default function QuizScreen() {
      PROGRESO
      ========================================================= */
 
+  // Recalcula los puntos totales desde Supabase (visitas + todos los
+  // resultados del quiz), por eso no recibe los puntos de la partida actual.
   async function actualizarProgreso(
-    usuarioId: string,
-    puntosQuiz: number
+    usuarioId: string
   ) {
     try {
       const {
@@ -1622,8 +1651,6 @@ export default function QuizScreen() {
               0),
           0
         );
-
-      void puntosQuiz;
 
       const puntosVisitas =
         lugaresVisitados.size *
@@ -1795,10 +1822,7 @@ export default function QuizScreen() {
      CATEGORÍAS
      ========================================================= */
 
-  if (
-    pantalla ===
-    "categorias"
-  ) {
+  function renderCategorias() {
     return (
       <ScrollView
         style={[
@@ -2010,10 +2034,7 @@ export default function QuizScreen() {
      CONFIGURACIÓN
      ========================================================= */
 
-  if (
-    pantalla ===
-    "configuracion"
-  ) {
+  function renderConfiguracion() {
     const limite =
       categoriaSeleccionada
         ? limiteCategoria(
@@ -2271,9 +2292,9 @@ export default function QuizScreen() {
      QUIZ
      ========================================================= */
 
-  if (
-    pantalla === "quiz" &&
-    preguntaActual
+  // Recibe la pregunta ya comprobada (no undefined)
+  function renderQuiz(
+    preguntaActual: Pregunta
   ) {
     return (
       <ScrollView
@@ -2473,7 +2494,7 @@ export default function QuizScreen() {
               opcionIndex;
 
             const letra =
-              String.fromCharCode(
+              String.fromCodePoint(
                 65 +
                   opcionIndex
               );
@@ -2612,10 +2633,7 @@ export default function QuizScreen() {
      RESULTADO
      ========================================================= */
 
-  if (
-    pantalla ===
-    "resultado"
-  ) {
+  function renderResultado() {
     const aciertos =
       resultado.filter(
         (item) =>
@@ -2923,6 +2941,15 @@ export default function QuizScreen() {
       </ScrollView>
     );
   }
+
+  /* =========================================================
+     PANTALLA ACTUAL
+     ========================================================= */
+
+  if (pantalla === "categorias") return renderCategorias();
+  if (pantalla === "configuracion") return renderConfiguracion();
+  if (pantalla === "quiz" && preguntaActual) return renderQuiz(preguntaActual);
+  if (pantalla === "resultado") return renderResultado();
 
   return null;
 }

@@ -87,6 +87,115 @@ function crearEstilosOscuros(colores: typeof COLORES.oscuro) {
   });
 }
 
+type EstilosOscuros = ReturnType<typeof crearEstilosOscuros>;
+type TipoFeedback = "interesado" | "no_interesado";
+
+// "Festival Cultural · 18 SEP, 6:00 PM" o "Sin eventos próximos"
+function describirProximoEvento(evento: Evento | null) {
+  if (!evento) return "Sin eventos próximos";
+  const { dia, mesCorto } = partesFecha(evento.fecha);
+  const hora = evento.hora ? `, ${formatearHora(evento.hora)}` : "";
+  return `${evento.titulo} · ${dia} ${mesCorto}${hora}`;
+}
+
+// Color del texto "Abierto hoy" / "Cerrado ahora"
+function colorEstado(abierto: boolean, esOscuro: boolean, colorCerrado: string) {
+  if (!abierto) return colorCerrado;
+  return esOscuro ? VERDE_OSCURO : VERDE;
+}
+
+// Descripción del lugar con "Leer más" / "Leer menos" si es larga
+function BloqueDescripcion({
+  descripcion,
+  expandida,
+  onAlternar,
+  o,
+}: Readonly<{
+  descripcion: string;
+  expandida: boolean;
+  onAlternar: () => void;
+  o: EstilosOscuros | null;
+}>) {
+  return (
+    <>
+      <Text style={[styles.descripcion, o?.texto]} numberOfLines={expandida ? undefined : 4}>
+        {descripcion}
+      </Text>
+
+      {descripcion.length > 180 && (
+        <TouchableOpacity onPress={onAlternar}>
+          <Text style={[styles.leerMas, o?.enlaceVerde]}>
+            {expandida ? "Leer menos" : "Leer más"}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </>
+  );
+}
+
+// Tarjeta "¿Te interesó este hito?" y el agradecimiento después de responder
+function TarjetaFeedback({
+  mostrar,
+  enviado,
+  o,
+  onCerrar,
+  onEnviar,
+}: Readonly<{
+  mostrar: boolean;
+  enviado: TipoFeedback | null;
+  o: EstilosOscuros | null;
+  onCerrar: () => void;
+  onEnviar: (tipo: TipoFeedback) => void;
+}>) {
+  if (enviado) {
+    const agradecimiento =
+      enviado === "interesado" ? "✅ Gracias, tomamos nota de tu interés." : "Gracias por tu opinión.";
+    return (
+      <View style={[styles.cardFeedbackEnviado, o?.tarjeta]}>
+        <Text style={[styles.textoFeedbackEnviado, o?.textoSecundario]}>{agradecimiento}</Text>
+      </View>
+    );
+  }
+
+  if (!mostrar) return null;
+
+  return (
+    <View style={[styles.cardFeedback, o?.tarjetaVerde]}>
+      <View style={styles.filaFeedbackEncabezado}>
+        <Text style={styles.iconoFeedback}>🌱</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.tituloFeedback, o?.texto]}>
+            ¿Te interesó este hito?
+          </Text>
+          <Text style={[styles.textoFeedback, o?.textoSecundario]}>
+            Tu opinión nos ayuda a mostrarte contenido que te guste más.
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onCerrar}>
+          <Text style={[styles.cerrarFeedback, o?.textoSecundario]}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.filaBotonesFeedback}>
+        <TouchableOpacity
+          style={styles.botonFeedbackSi}
+          onPress={() => onEnviar("interesado")}
+        >
+          <Text style={styles.textoBotonFeedbackSi}>
+            👍 Sí, me interesó
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.botonFeedbackNo, o?.botonSecundario]}
+          onPress={() => onEnviar("no_interesado")}
+        >
+          <Text style={[styles.textoBotonFeedbackNo, o?.texto]}>👎 No tanto</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export default function DetalleHitoScreen() {
   // Recibimos el id que viene en la URL (ej: /hito/abc-123)
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -265,12 +374,7 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
   const favorito = esFavorito(hito.id);
 
   // "Festival Cultural · 18 SEP, 6:00 PM"
-  let textoProximoEvento = "Sin eventos próximos";
-  if (proximoEvento) {
-    const { dia, mesCorto } = partesFecha(proximoEvento.fecha);
-    const hora = proximoEvento.hora ? `, ${formatearHora(proximoEvento.hora)}` : "";
-    textoProximoEvento = `${proximoEvento.titulo} · ${dia} ${mesCorto}${hora}`;
-  }
+  const textoProximoEvento = describirProximoEvento(proximoEvento);
 
   return (
     <View style={[styles.contenedor, o?.fondo]}>
@@ -361,85 +465,29 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
         {/* Descripción */}
         {hito.descripcion && (
-  <>
-    <Text
-      style={[styles.descripcion, o?.texto]}
-      numberOfLines={descripcionExpandida ? undefined : 4}
-    >
-      {hito.descripcion}
-    </Text>
-
-    {hito.descripcion.length > 180 && (
-      <TouchableOpacity
-        onPress={() =>
-          setDescripcionExpandida(!descripcionExpandida)
-        }
-      >
-        <Text style={[styles.leerMas, o?.enlaceVerde]}>
-          {descripcionExpandida ? "Leer menos" : "Leer más"}
-        </Text>
-      </TouchableOpacity>
-    )}
-  </>
-)}
-
-{/* 🆕 CAMBIO: tarjeta de feedback contextual "¿Te interesó este hito?" */}
-        {mostrarFeedback && !feedbackEnviado && (
-          <View style={[styles.cardFeedback, o?.tarjetaVerde]}>
-            <View style={styles.filaFeedbackEncabezado}>
-              <Text style={styles.iconoFeedback}>🌱</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.tituloFeedback, o?.texto]}>
-                  ¿Te interesó este hito?
-                </Text>
-                <Text style={[styles.textoFeedback, o?.textoSecundario]}>
-                  Tu opinión nos ayuda a mostrarte contenido que te guste más.
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setMostrarFeedback(false)}>
-                <Text style={[styles.cerrarFeedback, o?.textoSecundario]}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.filaBotonesFeedback}>
-              <TouchableOpacity
-                style={styles.botonFeedbackSi}
-                onPress={() => enviarFeedback("interesado")}
-              >
-                <Text style={styles.textoBotonFeedbackSi}>
-                  👍 Sí, me interesó
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.botonFeedbackNo, o?.botonSecundario]}
-                onPress={() => enviarFeedback("no_interesado")}
-              >
-                <Text style={[styles.textoBotonFeedbackNo, o?.texto]}>👎 No tanto</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <BloqueDescripcion
+            descripcion={hito.descripcion}
+            expandida={descripcionExpandida}
+            onAlternar={() => setDescripcionExpandida(!descripcionExpandida)}
+            o={o}
+          />
         )}
 
-        {feedbackEnviado && (
-          <View style={[styles.cardFeedbackEnviado, o?.tarjeta]}>
-            <Text style={[styles.textoFeedbackEnviado, o?.textoSecundario]}>
-              {feedbackEnviado === "interesado"
-                ? "✅ Gracias, tomamos nota de tu interés."
-                : "Gracias por tu opinión."}
-            </Text>
-          </View>
-        )}
+        {/* Tarjeta de feedback contextual "¿Te interesó este hito?" */}
+        <TarjetaFeedback
+          mostrar={mostrarFeedback}
+          enviado={feedbackEnviado}
+          o={o}
+          onCerrar={() => setMostrarFeedback(false)}
+          onEnviar={enviarFeedback}
+        />
 
         {/* Tarjeta de ESTADO (abierto/cerrado, calculado en tiempo real) */}
         <View style={[styles.card, styles.cardEstado, o?.tarjetaVerde]}>
           <Text
             style={[
               styles.textoEstado,
-              {
-                color: estado.abierto
-                  ? esOscuro ? VERDE_OSCURO : VERDE
-                  : colores.peligro,
-              },
+              { color: colorEstado(estado.abierto, esOscuro, colores.peligro) },
             ]}
           >
             {estado.abierto ? "Abierto hoy" : "Cerrado ahora"}

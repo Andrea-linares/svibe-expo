@@ -54,6 +54,31 @@ function pluralizar(cantidad: number, singular: string, plural: string) {
   return `${cantidad} ${cantidad === 1 ? singular : plural}`;
 }
 
+// Devuelve la reseña sin el comentario indicado
+function quitarComentarioDeResena(resena: ResenaForo, comentarioId: string): ResenaForo {
+  return {
+    ...resena,
+    comentarios: resena.comentarios.filter((c) => c.id !== comentarioId),
+  };
+}
+
+// Devuelve el hito sin la reseña (o, si se indica comentarioId, sin ese
+// comentario de la reseña) y con totalComentarios recalculado.
+// Si la reseña no es de este hito, lo devuelve tal cual.
+function quitarDeHito(hito: HitoForo, resenaId: string, comentarioId?: string): HitoForo {
+  if (!hito.resenas.some((r) => r.id === resenaId)) return hito;
+
+  const resenas = comentarioId
+    ? hito.resenas.map((r) => (r.id === resenaId ? quitarComentarioDeResena(r, comentarioId) : r))
+    : hito.resenas.filter((r) => r.id !== resenaId);
+
+  return {
+    ...hito,
+    resenas,
+    totalComentarios: resenas.reduce((suma, r) => suma + r.comentarios.length, 0),
+  };
+}
+
 function BotonEliminar({
   id,
   eliminando,
@@ -135,23 +160,7 @@ export default function AdminForoScreen() {
 
   // Quita la publicación de la lista sin recargar
   function quitarDeLista(resenaId: string, comentarioId?: string) {
-    setHitos((actual) =>
-      actual.map((hito) => {
-        if (!hito.resenas.some((r) => r.id === resenaId)) return hito;
-        const resenas = comentarioId
-          ? hito.resenas.map((r) =>
-              r.id === resenaId
-                ? { ...r, comentarios: r.comentarios.filter((c) => c.id !== comentarioId) }
-                : r,
-            )
-          : hito.resenas.filter((r) => r.id !== resenaId);
-        return {
-          ...hito,
-          resenas,
-          totalComentarios: resenas.reduce((suma, r) => suma + r.comentarios.length, 0),
-        };
-      }),
-    );
+    setHitos((actual) => actual.map((hito) => quitarDeHito(hito, resenaId, comentarioId)));
   }
 
   function confirmarEliminar(

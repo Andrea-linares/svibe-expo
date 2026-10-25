@@ -52,7 +52,7 @@ export default function CalendarioMensual({
   const desplazamiento = (new Date(anio, mes, 1).getDay() + 6) % 7;
   const diasEnMes = new Date(anio, mes + 1, 0).getDate();
   const celdas: (string | null)[] = [
-    ...Array<null>(desplazamiento).fill(null),
+    ...new Array<null>(desplazamiento).fill(null),
     ...Array.from({ length: diasEnMes }, (_, i) => aFechaISO(new Date(anio, mes, i + 1))),
   ];
   while (celdas.length % 7 !== 0) celdas.push(null);

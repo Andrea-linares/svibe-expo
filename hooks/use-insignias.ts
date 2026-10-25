@@ -84,6 +84,76 @@ async function obtenerInsigniasConEstado(usuarioId: string): Promise<InsigniaCon
   }));
 }
 
+// ---------- Conteos para los criterios ----------
+
+type RespuestaConteo = { count: number | null; error: unknown };
+
+// Espera una consulta de conteo (head: true); lanza su error o devuelve el total
+async function leerConteo(consulta: PromiseLike<RespuestaConteo>): Promise<number> {
+  const { count, error } = await consulta;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+// OJO: tu app usa "visita", no "visitado" (confirmado en perfil.tsx).
+function contarVisitas(usuarioId: string) {
+  return leerConteo(
+    supabase
+      .from("interacciones_usuario")
+      .select("*", { count: "exact", head: true })
+      .eq("usuario_id", usuarioId)
+      .eq("tipo_interaccion", "visita"),
+  );
+}
+
+function contarVisitasCategoria(usuarioId: string, categoriaId: number) {
+  return leerConteo(
+    supabase
+      .from("interacciones_usuario")
+      .select("hito_id, hitos!inner(categoria_id)", { count: "exact", head: true })
+      .eq("usuario_id", usuarioId)
+      .eq("tipo_interaccion", "visita")
+      .eq("hitos.categoria_id", categoriaId),
+  );
+}
+
+function contarResultadosQuiz(usuarioId: string) {
+  return leerConteo(
+    supabase
+      .from("quiz_resultados")
+      .select("*", { count: "exact", head: true })
+      .eq("usuario_id", usuarioId),
+  );
+}
+
+function contarFavoritos(usuarioId: string) {
+  return leerConteo(
+    supabase
+      .from("favoritos")
+      .select("*", { count: "exact", head: true })
+      .eq("usuario_id", usuarioId),
+  );
+}
+
+// Cuenta toda la participación en el foro: reseñas y comentarios.
+// Las dos consultas van en paralelo y los errores se revisan en el mismo
+// orden de siempre (primero reseñas, luego comentarios).
+async function contarParticipacionForo(usuarioId: string): Promise<number> {
+  const [resenas, comentarios] = await Promise.all([
+    supabase
+      .from("foro_posts")
+      .select("*", { count: "exact", head: true })
+      .eq("usuario_id", usuarioId),
+    supabase
+      .from("foro_comentarios")
+      .select("*", { count: "exact", head: true })
+      .eq("usuario_id", usuarioId),
+  ]);
+  if (resenas.error) throw resenas.error;
+  if (comentarios.error) throw comentarios.error;
+  return (resenas.count ?? 0) + (comentarios.count ?? 0);
+}
+
 async function cumpleCriterio(
   usuarioId: string,
   criterio: CriterioInsignia | null
@@ -91,72 +161,18 @@ async function cumpleCriterio(
   if (!criterio) return false;
 
   switch (criterio.tipo) {
-    // OJO: tu app usa "visita", no "visitado" (confirmado en perfil.tsx).
-    case "visitas_totales": {
-      const { count, error } = await supabase
-        .from("interacciones_usuario")
-        .select("*", { count: "exact", head: true })
-        .eq("usuario_id", usuarioId)
-        .eq("tipo_interaccion", "visita");
-      if (error) throw error;
-      return (count ?? 0) >= criterio.cantidad;
-    }
-
-    case "visitas_categoria": {
-      const { count, error } = await supabase
-        .from("interacciones_usuario")
-        .select("hito_id, hitos!inner(categoria_id)", { count: "exact", head: true })
-        .eq("usuario_id", usuarioId)
-        .eq("tipo_interaccion", "visita")
-        .eq("hitos.categoria_id", criterio.categoria_id);
-      if (error) throw error;
-      return (count ?? 0) >= criterio.cantidad;
-    }
-
-    case "quiz_completado": {
-      const { count, error } = await supabase
-        .from("quiz_resultados")
-        .select("*", { count: "exact", head: true })
-        .eq("usuario_id", usuarioId);
-      if (error) throw error;
-      return (count ?? 0) >= 1;
-    }
-
-    // Cuenta toda la participación en el foro: reseñas y comentarios
-    case "foro_comentarios_totales": {
-      const [resenas, comentarios] = await Promise.all([
-        supabase
-          .from("foro_posts")
-          .select("*", { count: "exact", head: true })
-          .eq("usuario_id", usuarioId),
-        supabase
-          .from("foro_comentarios")
-          .select("*", { count: "exact", head: true })
-          .eq("usuario_id", usuarioId),
-      ]);
-      if (resenas.error) throw resenas.error;
-      if (comentarios.error) throw comentarios.error;
-      return (resenas.count ?? 0) + (comentarios.count ?? 0) >= criterio.cantidad;
-    }
-
-    case "quiz_intentos": {
-      const { count, error } = await supabase
-      .from("quiz_resultados")
-      .select("*", { count: "exact", head: true })
-      .eq("usuario_id", usuarioId);
-    if (error) throw error;
-    return (count ?? 0) >= criterio.cantidad;
-    }
-
-    case "favoritos_totales": {
-    const { count, error } = await supabase
-    .from("favoritos")
-    .select("*", { count: "exact", head: true })
-    .eq("usuario_id", usuarioId);
-    if (error) throw error;
-  return (count ?? 0) >= criterio.cantidad;
-  }
-    
+    case "visitas_totales":
+      return (await contarVisitas(usuarioId)) >= criterio.cantidad;
+    case "visitas_categoria":
+      return (await contarVisitasCategoria(usuarioId, criterio.categoria_id)) >= criterio.cantidad;
+    case "quiz_completado":
+      return (await contarResultadosQuiz(usuarioId)) >= 1;
+    case "foro_comentarios_totales":
+      return (await contarParticipacionForo(usuarioId)) >= criterio.cantidad;
+    case "quiz_intentos":
+      return (await contarResultadosQuiz(usuarioId)) >= criterio.cantidad;
+    case "favoritos_totales":
+      return (await contarFavoritos(usuarioId)) >= criterio.cantidad;
     default:
       return false;
   }

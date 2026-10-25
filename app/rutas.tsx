@@ -5,15 +5,15 @@ import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
@@ -190,165 +190,223 @@ function iconoRuta(nombre: string): NombreIcono {
   return "map-outline";
 }
 
-/* ------------------------------ Pantalla --------------------------------- */
+/* --------------------------- Carga de datos ------------------------------ */
 
-export default function RutasScreen() {
-  // ---- Todos los hooks van aquí arriba, antes de cualquier return ----
-  const { colores } = useTema();
-  const insets = useSafeAreaInsets();
-  const { hitoId } = useLocalSearchParams<{ hitoId?: string }>();
+// Primera imagen de un hito según su orden, o null si no tiene
+function primeraImagen(imagenes: any[] | null): string | null {
+  const ordenadas = [...(imagenes ?? [])].sort(
+    (a: any, b: any) => (a.orden ?? 0) - (b.orden ?? 0),
+  );
+  return ordenadas.length > 0 ? ordenadas[0].url : null;
+}
 
-  const [datos, setDatos] = useState<Datos | null>(null);
-  const [errorCarga, setErrorCarga] = useState(false);
-  const [intento, setIntento] = useState(0); // para reintentar
-  const [seleccion, setSeleccion] = useState<string>(DINAMICA);
-  const [guardando, setGuardando] = useState(false);
+// 1) Hitos + categorías + primera imagen
+async function cargarHitos(): Promise<Hito[]> {
+  const [{ data: hitosData, error: errHitos }, { data: catData }] =
+    await Promise.all([
+      supabase
+        .from("hitos")
+        .select("id, nombre, lat, lng, categoria_id, hito_imagenes(url, orden)"),
+      supabase.from("categorias").select("id, nombre"),
+    ]);
+  if (errHitos) throw errHitos;
 
-  // Carga de datos (una sola vez, o al reintentar)
-  useEffect(() => {
-    let activo = true;
+  const nombreCategoria = new Map<number, string>(
+    (catData ?? []).map((c: any) => [c.id, c.nombre]),
+  );
 
-    async function cargar() {
-      setErrorCarga(false);
-      setDatos(null);
-      try {
-        // 1) Hitos + categorías + primera imagen
-        const [{ data: hitosData, error: errHitos }, { data: catData }] =
-          await Promise.all([
-            supabase
-              .from("hitos")
-              .select("id, nombre, lat, lng, categoria_id, hito_imagenes(url, orden)"),
-            supabase.from("categorias").select("id, nombre"),
-          ]);
-        if (errHitos) throw errHitos;
+  return (hitosData ?? [])
+    .filter((h: any) => h.lat != null && h.lng != null)
+    .map((h: any) => ({
+      id: h.id,
+      nombre: h.nombre,
+      lat: h.lat,
+      lng: h.lng,
+      categoriaId: h.categoria_id,
+      categoriaNombre: nombreCategoria.get(h.categoria_id) ?? "Hito",
+      imagenUrl: primeraImagen(h.hito_imagenes),
+    }));
+}
 
-        const nombreCategoria = new Map<number, string>(
-          (catData ?? []).map((c: any) => [c.id, c.nombre]),
-        );
+type DatosUsuario = Pick<Datos, "usuarioId" | "preferencias" | "propias">;
 
-        const todos: Hito[] = (hitosData ?? [])
-          .filter((h: any) => h.lat != null && h.lng != null)
-          .map((h: any) => {
-            const imgs = [...(h.hito_imagenes ?? [])].sort(
-              (a: any, b: any) => (a.orden ?? 0) - (b.orden ?? 0),
-            );
-            return {
-              id: h.id,
-              nombre: h.nombre,
-              lat: h.lat,
-              lng: h.lng,
-              categoriaId: h.categoria_id,
-              categoriaNombre: nombreCategoria.get(h.categoria_id) ?? "Hito",
-              imagenUrl: imgs.length > 0 ? imgs[0].url : null,
-            };
-          });
+// 2) Usuario y sus preferencias (solo si inició sesión)
+async function cargarDatosUsuario(): Promise<DatosUsuario> {
+  const { data: sesion } = await supabase.auth.getUser();
+  if (!sesion?.user) return { usuarioId: null, preferencias: [], propias: [] };
 
-        // 2) Usuario y sus preferencias (solo si inició sesión)
-        let usuarioId: string | null = null;
-        let preferencias: number[] = [];
-        let propias: string[] = [];
-        const { data: sesion } = await supabase.auth.getUser();
-        if (sesion?.user) {
-          usuarioId = sesion.user.id;
-          const { data: prefs } = await supabase
-            .from("usuario_categorias")
-            .select("categoria_id")
-            .eq("usuario_id", usuarioId);
-          preferencias = (prefs ?? []).map((p: any) => p.categoria_id);
+  const usuarioId = sesion.user.id;
+  const { data: prefs } = await supabase
+    .from("usuario_categorias")
+    .select("categoria_id")
+    .eq("usuario_id", usuarioId);
 
-          // Rutas que este usuario ya guardó (para marcar el corazón)
-          const { data: propiasData } = await supabase
-            .from("rutas")
-            .select("nombre")
-            .eq("usuario_id", usuarioId);
-          propias = (propiasData ?? []).map((r: any) => r.nombre);
-        }
+  // Rutas que este usuario ya guardó (para marcar el corazón)
+  const { data: propiasData } = await supabase
+    .from("rutas")
+    .select("nombre")
+    .eq("usuario_id", usuarioId);
 
-        // 3) Rutas fijas (usuario_id vacío) y sus paradas
-        let fijas: RutaFija[] = [];
-        const { data: rutasData } = await supabase
-          .from("rutas")
-          .select("id, nombre")
-          .is("usuario_id", null)
-          .order("nombre", { ascending: true });
-        const ids = (rutasData ?? []).map((r: any) => r.id);
-        if (ids.length > 0) {
-          const { data: itemsData } = await supabase
-            .from("ruta_items")
-            .select("ruta_id, referencia_id, orden")
-            .in("ruta_id", ids)
-            .eq("tipo_item", TIPO_ITEM_HITO);
-          fijas = (rutasData ?? []).map((r: any) => ({
-            id: r.id,
-            nombre: r.nombre,
-            hitoIds: (itemsData ?? [])
-              .filter((i: any) => i.ruta_id === r.id)
-              .sort((a: any, b: any) => (a.orden ?? 0) - (b.orden ?? 0))
-              .map((i: any) => i.referencia_id),
-          }));
-        }
+  return {
+    usuarioId,
+    preferencias: (prefs ?? []).map((p: any) => p.categoria_id),
+    propias: (propiasData ?? []).map((r: any) => r.nombre),
+  };
+}
 
-        // 4) Ubicación del usuario (opcional si viene de un hito o elige una ruta fija)
-        let usuario: Coord | null = null;
-        try {
-          const permiso = await Location.requestForegroundPermissionsAsync();
-          if (permiso.status === "granted") {
-            const pos = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-            });
-            usuario = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          }
-        } catch {
-          usuario = null;
-        }
+// Ids de los hitos de una ruta fija, en su orden
+function hitosDeRuta(items: any[], rutaId: string): string[] {
+  return items
+    .filter((i: any) => i.ruta_id === rutaId)
+    .sort((a: any, b: any) => (a.orden ?? 0) - (b.orden ?? 0))
+    .map((i: any) => i.referencia_id);
+}
 
-        if (activo) setDatos({ todos, preferencias, usuario, usuarioId, fijas, propias });
-      } catch (e) {
-        console.error("Error cargando rutas:", e);
-        if (activo) setErrorCarga(true);
-      }
-    }
+// 3) Rutas fijas (usuario_id vacío) y sus paradas
+async function cargarRutasFijas(): Promise<RutaFija[]> {
+  const { data: rutasData } = await supabase
+    .from("rutas")
+    .select("id, nombre")
+    .is("usuario_id", null)
+    .order("nombre", { ascending: true });
+  const ids = (rutasData ?? []).map((r: any) => r.id);
+  if (ids.length === 0) return [];
 
-    cargar();
-    return () => {
-      activo = false;
-    };
-  }, [intento]);
+  const { data: itemsData } = await supabase
+    .from("ruta_items")
+    .select("ruta_id, referencia_id, orden")
+    .in("ruta_id", ids)
+    .eq("tipo_item", TIPO_ITEM_HITO);
 
-  // Ruta que se está mostrando según el chip elegido
-  const resultado = useMemo<Resultado | null>(() => {
-    if (!datos) return null;
-    if (seleccion === DINAMICA) return armarRutaDinamica(datos, hitoId);
-    const ruta = datos.fijas.find((r) => r.id === seleccion);
-    return ruta ? armarRutaFija(datos, ruta) : null;
-  }, [datos, seleccion, hitoId]);
+  return (rutasData ?? []).map((r: any) => ({
+    id: r.id,
+    nombre: r.nombre,
+    hitoIds: hitosDeRuta(itemsData ?? [], r.id),
+  }));
+}
 
-  // Totales
-  const totales = useMemo(() => {
-    if (!resultado) return { km: 0, min: 0 };
-    const km = resultado.paradas.reduce((s, p) => s + (p.tramoKm ?? 0), 0);
-    const viaje = resultado.paradas.reduce((s, p) => s + (p.tramoMin ?? 0), 0);
-    return { km, min: viaje + resultado.paradas.length * VISITA_MIN };
-  }, [resultado]);
+// 4) Ubicación del usuario (opcional si viene de un hito o elige una ruta fija)
+async function obtenerUbicacion(): Promise<Coord | null> {
+  try {
+    const permiso = await Location.requestForegroundPermissionsAsync();
+    if (permiso.status !== "granted") return null;
+    const pos = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  } catch {
+    return null;
+  }
+}
 
-  // Mapa Leaflet (mismo enfoque que mapa.tsx)
-  const html = useMemo(() => {
-    if (!resultado) return "";
-    const info = {
-      usuario: resultado.usuario,
-      conectarUsuario: resultado.conectarUsuario,
-      acento: ACENTO,
-      paradas: resultado.paradas.map((p, i) => ({
-        n: i + 1,
-        lat: p.lat,
-        lng: p.lng,
-        nombre: p.nombre,
-        color: estiloCategoria(p.categoriaNombre).color,
-      })),
-    };
-    const json = JSON.stringify(info).replace(/</g, "\\u003c");
+// Carga todo lo que necesita la pantalla, en el mismo orden de siempre
+async function cargarDatosRutas(): Promise<Datos> {
+  const todos = await cargarHitos();
+  const { usuarioId, preferencias, propias } = await cargarDatosUsuario();
+  const fijas = await cargarRutasFijas();
+  const usuario = await obtenerUbicacion();
+  return { todos, preferencias, usuario, usuarioId, fijas, propias };
+}
 
-    return `
+/* --------------------------- Datos derivados ----------------------------- */
+
+type Vista = "cargando" | "error" | "sinUbicacion" | "sinRuta" | "rutaVacia" | "listo";
+type VistaMensaje = Exclude<Vista, "cargando" | "listo">;
+type Opcion = { id: string; nombre: string; icono: NombreIcono };
+type Colores = ReturnType<typeof useTema>["colores"];
+
+// Ruta que se está mostrando según el chip elegido
+function armarResultado(
+  datos: Datos | null,
+  seleccion: string,
+  hitoId?: string,
+): Resultado | null {
+  if (!datos) return null;
+  if (seleccion === DINAMICA) return armarRutaDinamica(datos, hitoId);
+  const ruta = datos.fijas.find((r) => r.id === seleccion);
+  return ruta ? armarRutaFija(datos, ruta) : null;
+}
+
+// Totales: distancia y tiempo (viaje + visita en cada parada)
+function calcularTotales(resultado: Resultado | null) {
+  if (!resultado) return { km: 0, min: 0 };
+  const km = resultado.paradas.reduce((s, p) => s + (p.tramoKm ?? 0), 0);
+  const viaje = resultado.paradas.reduce((s, p) => s + (p.tramoMin ?? 0), 0);
+  return { km, min: viaje + resultado.paradas.length * VISITA_MIN };
+}
+
+// Nombre con el que se guarda la ruta que se está viendo
+function nombreRutaActual(
+  datos: Datos | null,
+  resultado: Resultado | null,
+  seleccion: string,
+): string | null {
+  if (!resultado) return null;
+  const fijaActual = datos?.fijas.find((r) => r.id === seleccion);
+  return fijaActual ? fijaActual.nombre : `Ruta desde ${resultado.paradas[0].nombre}`;
+}
+
+// Si la ruta que se está viendo ya está entre las guardadas del usuario
+function estaGuardada(datos: Datos | null, nombre: string | null) {
+  if (!datos || nombre === null) return false;
+  return datos.propias.includes(nombre);
+}
+
+// Qué vista toca mostrar
+function determinarVista(
+  errorCarga: boolean,
+  datos: Datos | null,
+  resultado: Resultado | null,
+  seleccion: string,
+  hitoId?: string,
+): Vista {
+  if (errorCarga) return "error";
+  if (!datos) return "cargando";
+  if (resultado) return "listo";
+  if (seleccion !== DINAMICA) return "rutaVacia";
+  if (!hitoId && !datos.usuario) return "sinUbicacion";
+  return "sinRuta";
+}
+
+// Chips: la ruta dinámica y las rutas fijas
+function opcionesDeRuta(datos: Datos | null, hitoId?: string): Opcion[] {
+  if (!datos) return [];
+  return [
+    {
+      id: DINAMICA,
+      nombre: hitoId ? "Desde este hito" : "Cerca de mí",
+      icono: hitoId ? "location-outline" : "navigate-outline",
+    },
+    ...datos.fijas.map((r) => ({ id: r.id, nombre: r.nombre, icono: iconoRuta(r.nombre) })),
+  ];
+}
+
+// Texto bajo cada parada: distancia y tiempo desde el punto anterior
+function detalleParada(p: Parada, indice: number, conectarUsuario: boolean) {
+  if (p.tramoKm == null || p.tramoMin == null) return "Punto de partida";
+  const desde =
+    indice === 0 && conectarUsuario ? "desde tu ubicación" : "desde la parada anterior";
+  return `${p.tramoKm.toFixed(1)} km · ${p.tramoMin} min ${desde}`;
+}
+
+// Mapa Leaflet (mismo enfoque que mapa.tsx)
+function generarHtmlMapa(resultado: Resultado | null) {
+  if (!resultado) return "";
+  const info = {
+    usuario: resultado.usuario,
+    conectarUsuario: resultado.conectarUsuario,
+    acento: ACENTO,
+    paradas: resultado.paradas.map((p, i) => ({
+      n: i + 1,
+      lat: p.lat,
+      lng: p.lng,
+      nombre: p.nombre,
+      color: estiloCategoria(p.categoriaNombre).color,
+    })),
+  };
+  const json = JSON.stringify(info).replaceAll("<", "\\u003c");
+
+  return `
       <!DOCTYPE html>
       <html>
         <head>
@@ -404,16 +462,321 @@ export default function RutasScreen() {
         </body>
       </html>
     `;
-  }, [resultado]);
+}
+
+// Abrir la ruta en Google Maps (sin API key, solo URL)
+function abrirEnGoogleMaps(resultado: Resultado) {
+  const pts: Coord[] = [
+    ...(resultado.conectarUsuario && resultado.usuario ? [resultado.usuario] : []),
+    ...resultado.paradas,
+  ];
+  const f = (p: Coord) => `${p.lat},${p.lng}`;
+  const medio = pts.slice(1, -1).map(f).join("|");
+  let url =
+    `https://www.google.com/maps/dir/?api=1&travelmode=driving` +
+    `&origin=${f(pts[0])}&destination=${f(pts[pts.length - 1])}`;
+  if (medio) url += `&waypoints=${encodeURIComponent(medio)}`;
+  Linking.openURL(url);
+}
+
+/* --------------------------- Rutas guardadas ----------------------------- */
+
+function pedirInicioSesion() {
+  Alert.alert("Inicia sesión", "Necesitas una cuenta para guardar rutas.", [
+    { text: "Ahora no", style: "cancel" },
+    { text: "Iniciar sesión", onPress: () => router.push("/login") },
+  ]);
+}
+
+// Quita de guardadas: borra las rutas del usuario con ese nombre y sus paradas
+async function quitarRutaGuardada(usuarioId: string, nombre: string) {
+  const { data: existentes, error: errBuscar } = await supabase
+    .from("rutas")
+    .select("id")
+    .eq("usuario_id", usuarioId)
+    .eq("nombre", nombre);
+  if (errBuscar) throw errBuscar;
+
+  const ids = (existentes ?? []).map((r: any) => r.id);
+  if (ids.length === 0) return;
+
+  const { error: errItems } = await supabase.from("ruta_items").delete().in("ruta_id", ids);
+  if (errItems) throw errItems;
+  const { error: errRutas } = await supabase.from("rutas").delete().in("id", ids);
+  if (errRutas) throw errRutas;
+}
+
+// Guarda la ruta (rutas + ruta_items) con sus paradas en orden
+async function guardarRuta(usuarioId: string, nombre: string, paradas: Parada[]) {
+  const { data: ruta, error: errRuta } = await supabase
+    .from("rutas")
+    .insert({ usuario_id: usuarioId, nombre })
+    .select("id")
+    .single();
+  if (errRuta || !ruta) throw errRuta ?? new Error("No se pudo crear la ruta");
+
+  const items = paradas.map((p, i) => ({
+    ruta_id: ruta.id,
+    tipo_item: TIPO_ITEM_HITO,
+    referencia_id: p.id,
+    orden: i + 1,
+  }));
+  const { error: errItems } = await supabase.from("ruta_items").insert(items);
+  if (errItems) {
+    // Si fallan las paradas, no dejamos una ruta vacía
+    await supabase.from("rutas").delete().eq("id", ruta.id);
+    throw errItems;
+  }
+}
+
+// Actualiza la lista local de rutas guardadas tras guardar o quitar
+function agregarPropia(d: Datos | null, nombre: string): Datos | null {
+  return d ? { ...d, propias: [...d.propias, nombre] } : d;
+}
+
+function quitarPropia(d: Datos | null, nombre: string): Datos | null {
+  return d ? { ...d, propias: d.propias.filter((n) => n !== nombre) } : d;
+}
+
+/* ---------------------------- Componentes -------------------------------- */
+
+function ChipsRutas({
+  opciones,
+  seleccion,
+  colores,
+  onElegir,
+}: Readonly<{
+  opciones: Opcion[];
+  seleccion: string;
+  colores: Colores;
+  onElegir: (id: string) => void;
+}>) {
+  if (opciones.length === 0) return null;
+
+  return (
+    <View style={[styles.barraChips, { backgroundColor: colores.encabezado, borderBottomColor: colores.borde }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.contenidoChips}>
+        {opciones.map((o) => {
+          const activo = o.id === seleccion;
+          return (
+            <TouchableOpacity
+              key={o.id}
+              onPress={() => onElegir(o.id)}
+              style={[
+                styles.chipRuta,
+                activo
+                  ? { backgroundColor: ACENTO, borderColor: ACENTO }
+                  : { backgroundColor: colores.tarjeta, borderColor: colores.borde },
+              ]}
+            >
+              <Ionicons name={o.icono} size={16} color={activo ? "#fff" : colores.textoSecundario} />
+              <Text style={[styles.textoChipRuta, { color: activo ? "#fff" : colores.texto }]}>{o.nombre}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+// Cargando, error, sin ubicación, sin ruta o ruta vacía
+function VistaEstado({
+  vista,
+  colores,
+  onReintentar,
+  onVerCercaDeMi,
+}: Readonly<{
+  vista: Vista;
+  colores: Colores;
+  onReintentar: () => void;
+  onVerCercaDeMi: () => void;
+}>) {
+  if (vista === "cargando") {
+    return (
+      <>
+        <ActivityIndicator size="large" color={ACENTO} />
+        <Text style={[styles.textoVacio, { color: colores.textoSecundario, marginTop: 14 }]}>
+          Armando tu ruta…
+        </Text>
+      </>
+    );
+  }
+
+  const mensajes = {
+    error: {
+      icono: "alert-circle-outline" as NombreIcono,
+      titulo: "No pudimos cargar las rutas",
+      texto: "Revisa tu conexión a internet e inténtalo de nuevo.",
+      boton: "Intentar de nuevo",
+      accion: onReintentar,
+    },
+    sinUbicacion: {
+      icono: "location-outline" as NombreIcono,
+      titulo: "Necesitamos tu ubicación",
+      texto: "Activa el permiso de ubicación para armar una ruta cerca de ti, o elige una de las rutas de arriba.",
+      boton: "Intentar de nuevo",
+      accion: onReintentar,
+    },
+    sinRuta: {
+      icono: "map-outline" as NombreIcono,
+      titulo: "No hay rutas disponibles en esta zona",
+      texto: "No encontramos hitos culturales cerca. Prueba acercándote a otra zona o elige una de las rutas de arriba.",
+      boton: "Volver al mapa",
+      accion: () => router.back(),
+    },
+    rutaVacia: {
+      icono: "map-outline" as NombreIcono,
+      titulo: "Esta ruta aún no está lista",
+      texto: "Todavía no tiene suficientes lugares. Prueba con otra ruta.",
+      boton: "Ver ruta cerca de mí",
+      accion: onVerCercaDeMi,
+    },
+  };
+  const m = mensajes[vista as VistaMensaje];
+
+  return (
+    <>
+      <Ionicons name={m.icono} size={64} color={ACENTO} />
+      <Text style={[styles.tituloVacio, { color: colores.texto }]}>{m.titulo}</Text>
+      <Text style={[styles.textoVacio, { color: colores.textoSecundario }]}>{m.texto}</Text>
+      <TouchableOpacity style={styles.botonPrimario} onPress={m.accion}>
+        <Text style={styles.textoBotonPrimario}>{m.boton}</Text>
+      </TouchableOpacity>
+    </>
+  );
+}
+
+function FilaParada({
+  parada: p,
+  indice: i,
+  total,
+  conectarUsuario,
+  colores,
+}: Readonly<{
+  parada: Parada;
+  indice: number;
+  total: number;
+  conectarUsuario: boolean;
+  colores: Colores;
+}>) {
+  const cat = estiloCategoria(p.categoriaNombre);
+  const detalle = detalleParada(p, i, conectarUsuario);
+
+  return (
+    <View style={styles.filaParada}>
+      <View style={styles.columnaNumero}>
+        <View style={styles.numero}>
+          <Text style={styles.textoNumero}>{i + 1}</Text>
+        </View>
+        {i < total - 1 && <View style={[styles.conector, { borderColor: ACENTO }]} />}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.tarjetaParada, { backgroundColor: colores.tarjeta, borderColor: colores.borde }]}
+        onPress={() => router.push(`/hito/${p.id}`)}
+      >
+        {p.imagenUrl ? (
+          <Image source={{ uri: p.imagenUrl }} style={styles.miniatura} />
+        ) : (
+          <View style={[styles.miniatura, styles.miniaturaVacia, { backgroundColor: cat.color + "22" }]}>
+            <Ionicons name={cat.icono} size={28} color={cat.color} />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.nombreParada, { color: colores.texto }]} numberOfLines={2}>
+            {p.nombre}
+          </Text>
+          <View style={styles.filaCategoria}>
+            <Ionicons name={cat.icono} size={14} color={cat.color} />
+            <Text style={[styles.textoCategoria, { color: cat.color }]}>{p.categoriaNombre}</Text>
+          </View>
+          <Text style={[styles.detalleParada, { color: colores.textoSecundario }]}>{detalle}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colores.textoSecundario} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function BotonGuardar({
+  guardada,
+  guardando,
+  onPress,
+}: Readonly<{ guardada: boolean; guardando: boolean; onPress: () => void }>) {
+  return (
+    <TouchableOpacity
+      style={[styles.botonSecundario, guardada && styles.botonGuardada]}
+      onPress={onPress}
+      disabled={guardando}
+    >
+      {guardando ? (
+        <ActivityIndicator size="small" color={ACENTO} />
+      ) : (
+        <>
+          <Ionicons
+            name={guardada ? "heart" : "heart-outline"}
+            size={18}
+            color={ACENTO}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={styles.textoBotonSecundario}>{guardada ? "Guardada" : "Guardar ruta"}</Text>
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+/* ------------------------------ Pantalla --------------------------------- */
+
+export default function RutasScreen() {
+  // ---- Todos los hooks van aquí arriba, antes de cualquier return ----
+  const { colores } = useTema();
+  const insets = useSafeAreaInsets();
+  const { hitoId } = useLocalSearchParams<{ hitoId?: string }>();
+
+  const [datos, setDatos] = useState<Datos | null>(null);
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [intento, setIntento] = useState(0); // para reintentar
+  const [seleccion, setSeleccion] = useState<string>(DINAMICA);
+  const [guardando, setGuardando] = useState(false);
+
+  // Carga de datos (una sola vez, o al reintentar)
+  useEffect(() => {
+    let activo = true;
+
+    async function cargar() {
+      setErrorCarga(false);
+      setDatos(null);
+      try {
+        const nuevos = await cargarDatosRutas();
+        if (activo) setDatos(nuevos);
+      } catch (e) {
+        console.error("Error cargando rutas:", e);
+        if (activo) setErrorCarga(true);
+      }
+    }
+
+    cargar();
+    return () => {
+      activo = false;
+    };
+  }, [intento]);
+
+  // Ruta que se está mostrando según el chip elegido
+  const resultado = useMemo<Resultado | null>(
+    () => armarResultado(datos, seleccion, hitoId),
+    [datos, seleccion, hitoId],
+  );
+
+  // Totales
+  const totales = useMemo(() => calcularTotales(resultado), [resultado]);
+
+  // Mapa Leaflet (mismo enfoque que mapa.tsx)
+  const html = useMemo(() => generarHtmlMapa(resultado), [resultado]);
 
   // Nombre con el que se guarda la ruta que se está viendo, y si ya está guardada
-  const fijaActual = datos ? datos.fijas.find((r) => r.id === seleccion) : undefined;
-  const nombreActual = resultado
-    ? fijaActual
-      ? fijaActual.nombre
-      : `Ruta desde ${resultado.paradas[0].nombre}`
-    : null;
-  const guardada = !!datos && nombreActual !== null && datos.propias.includes(nombreActual);
+  const nombreActual = nombreRutaActual(datos, resultado, seleccion);
+  const guardada = estaGuardada(datos, nombreActual);
 
   /* ----------------------------- Acciones -------------------------------- */
 
@@ -423,18 +786,7 @@ export default function RutasScreen() {
 
   // Abrir la ruta en Google Maps (sin API key, solo URL)
   function iniciarRuta() {
-    if (!resultado) return;
-    const pts: Coord[] = [
-      ...(resultado.conectarUsuario && resultado.usuario ? [resultado.usuario] : []),
-      ...resultado.paradas,
-    ];
-    const f = (p: Coord) => `${p.lat},${p.lng}`;
-    const medio = pts.slice(1, -1).map(f).join("|");
-    let url =
-      `https://www.google.com/maps/dir/?api=1&travelmode=driving` +
-      `&origin=${f(pts[0])}&destination=${f(pts[pts.length - 1])}`;
-    if (medio) url += `&waypoints=${encodeURIComponent(medio)}`;
-    Linking.openURL(url);
+    if (resultado) abrirEnGoogleMaps(resultado);
   }
 
   // Corazón: guarda la ruta actual (rutas + ruta_items) o la quita si ya estaba guardada
@@ -442,10 +794,7 @@ export default function RutasScreen() {
     if (!resultado || !datos || !nombreActual || guardando) return;
 
     if (!datos.usuarioId) {
-      Alert.alert("Inicia sesión", "Necesitas una cuenta para guardar rutas.", [
-        { text: "Ahora no", style: "cancel" },
-        { text: "Iniciar sesión", onPress: () => router.push("/login") },
-      ]);
+      pedirInicioSesion();
       return;
     }
 
@@ -454,47 +803,12 @@ export default function RutasScreen() {
     setGuardando(true);
     try {
       if (guardada) {
-        // ---- Quitar de guardadas ----
-        const { data: existentes, error: errBuscar } = await supabase
-          .from("rutas")
-          .select("id")
-          .eq("usuario_id", usuarioId)
-          .eq("nombre", nombre);
-        if (errBuscar) throw errBuscar;
-
-        const ids = (existentes ?? []).map((r: any) => r.id);
-        if (ids.length > 0) {
-          const { error: errItems } = await supabase.from("ruta_items").delete().in("ruta_id", ids);
-          if (errItems) throw errItems;
-          const { error: errRutas } = await supabase.from("rutas").delete().in("id", ids);
-          if (errRutas) throw errRutas;
-        }
-        setDatos((d) => (d ? { ...d, propias: d.propias.filter((n) => n !== nombre) } : d));
-        return;
+        await quitarRutaGuardada(usuarioId, nombre);
+        setDatos((d) => quitarPropia(d, nombre));
+      } else {
+        await guardarRuta(usuarioId, nombre, resultado.paradas);
+        setDatos((d) => agregarPropia(d, nombre));
       }
-
-      // ---- Guardar ----
-      const { data: ruta, error: errRuta } = await supabase
-        .from("rutas")
-        .insert({ usuario_id: usuarioId, nombre })
-        .select("id")
-        .single();
-      if (errRuta || !ruta) throw errRuta ?? new Error("No se pudo crear la ruta");
-
-      const items = resultado.paradas.map((p, i) => ({
-        ruta_id: ruta.id,
-        tipo_item: TIPO_ITEM_HITO,
-        referencia_id: p.id,
-        orden: i + 1,
-      }));
-      const { error: errItems } = await supabase.from("ruta_items").insert(items);
-      if (errItems) {
-        // Si fallan las paradas, no dejamos una ruta vacía
-        await supabase.from("rutas").delete().eq("id", ruta.id);
-        throw errItems;
-      }
-
-      setDatos((d) => (d ? { ...d, propias: [...d.propias, nombre] } : d));
     } catch (e: any) {
       Alert.alert(
         guardada ? "No se pudo quitar" : "No se pudo guardar",
@@ -522,112 +836,30 @@ export default function RutasScreen() {
     </View>
   );
 
-  const opciones: { id: string; nombre: string; icono: NombreIcono }[] = datos
-    ? [
-        {
-          id: DINAMICA,
-          nombre: hitoId ? "Desde este hito" : "Cerca de mí",
-          icono: hitoId ? "location-outline" : "navigate-outline",
-        },
-        ...datos.fijas.map((r) => ({ id: r.id, nombre: r.nombre, icono: iconoRuta(r.nombre) })),
-      ]
-    : [];
-
-  const chips = datos ? (
-    <View style={[styles.barraChips, { backgroundColor: colores.encabezado, borderBottomColor: colores.borde }]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.contenidoChips}>
-        {opciones.map((o) => {
-          const activo = o.id === seleccion;
-          return (
-            <TouchableOpacity
-              key={o.id}
-              onPress={() => elegir(o.id)}
-              style={[
-                styles.chipRuta,
-                activo
-                  ? { backgroundColor: ACENTO, borderColor: ACENTO }
-                  : { backgroundColor: colores.tarjeta, borderColor: colores.borde },
-              ]}
-            >
-              <Ionicons name={o.icono} size={16} color={activo ? "#fff" : colores.textoSecundario} />
-              <Text style={[styles.textoChipRuta, { color: activo ? "#fff" : colores.texto }]}>{o.nombre}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  ) : null;
+  const chips = (
+    <ChipsRutas
+      opciones={opcionesDeRuta(datos, hitoId)}
+      seleccion={seleccion}
+      colores={colores}
+      onElegir={elegir}
+    />
+  );
 
   // Qué vista toca mostrar
-  const esFija = seleccion !== DINAMICA;
-  let vista: "cargando" | "error" | "sinUbicacion" | "sinRuta" | "rutaVacia" | "listo" = "listo";
-  if (errorCarga) vista = "error";
-  else if (!datos) vista = "cargando";
-  else if (!resultado) {
-    if (esFija) vista = "rutaVacia";
-    else if (!hitoId && !datos.usuario) vista = "sinUbicacion";
-    else vista = "sinRuta";
-  }
+  const vista = determinarVista(errorCarga, datos, resultado, seleccion, hitoId);
 
   if (vista !== "listo" || !resultado) {
-    const mensajes = {
-      error: {
-        icono: "alert-circle-outline" as NombreIcono,
-        titulo: "No pudimos cargar las rutas",
-        texto: "Revisa tu conexión a internet e inténtalo de nuevo.",
-        boton: "Intentar de nuevo",
-        accion: () => setIntento((n) => n + 1),
-      },
-      sinUbicacion: {
-        icono: "location-outline" as NombreIcono,
-        titulo: "Necesitamos tu ubicación",
-        texto: "Activa el permiso de ubicación para armar una ruta cerca de ti, o elige una de las rutas de arriba.",
-        boton: "Intentar de nuevo",
-        accion: () => setIntento((n) => n + 1),
-      },
-      sinRuta: {
-        icono: "map-outline" as NombreIcono,
-        titulo: "No hay rutas disponibles en esta zona",
-        texto: "No encontramos hitos culturales cerca. Prueba acercándote a otra zona o elige una de las rutas de arriba.",
-        boton: "Volver al mapa",
-        accion: () => router.back(),
-      },
-      rutaVacia: {
-        icono: "map-outline" as NombreIcono,
-        titulo: "Esta ruta aún no está lista",
-        texto: "Todavía no tiene suficientes lugares. Prueba con otra ruta.",
-        boton: "Ver ruta cerca de mí",
-        accion: () => elegir(DINAMICA),
-      },
-    };
-
     return (
       <View style={[styles.pantalla, { backgroundColor: colores.fondo }]}>
         {encabezado}
         {chips}
         <View style={styles.centrado}>
-          {vista === "cargando" ? (
-            <>
-              <ActivityIndicator size="large" color={ACENTO} />
-              <Text style={[styles.textoVacio, { color: colores.textoSecundario, marginTop: 14 }]}>
-                Armando tu ruta…
-              </Text>
-            </>
-          ) : (
-            (() => {
-              const m = mensajes[vista as keyof typeof mensajes];
-              return (
-                <>
-                  <Ionicons name={m.icono} size={64} color={ACENTO} />
-                  <Text style={[styles.tituloVacio, { color: colores.texto }]}>{m.titulo}</Text>
-                  <Text style={[styles.textoVacio, { color: colores.textoSecundario }]}>{m.texto}</Text>
-                  <TouchableOpacity style={styles.botonPrimario} onPress={m.accion}>
-                    <Text style={styles.textoBotonPrimario}>{m.boton}</Text>
-                  </TouchableOpacity>
-                </>
-              );
-            })()
-          )}
+          <VistaEstado
+            vista={vista}
+            colores={colores}
+            onReintentar={() => setIntento((n) => n + 1)}
+            onVerCercaDeMi={() => elegir(DINAMICA)}
+          />
         </View>
       </View>
     );
@@ -652,48 +884,16 @@ export default function RutasScreen() {
       {/* Panel inferior */}
       <View style={[styles.panel, { backgroundColor: colores.fondo }]}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 8 }}>
-          {resultado.paradas.map((p, i) => {
-            const cat = estiloCategoria(p.categoriaNombre);
-            let detalle = "Punto de partida";
-            if (p.tramoKm != null && p.tramoMin != null) {
-              const desde = i === 0 && resultado.conectarUsuario ? "desde tu ubicación" : "desde la parada anterior";
-              detalle = `${p.tramoKm.toFixed(1)} km · ${p.tramoMin} min ${desde}`;
-            }
-            return (
-              <View key={p.id} style={styles.filaParada}>
-                <View style={styles.columnaNumero}>
-                  <View style={styles.numero}>
-                    <Text style={styles.textoNumero}>{i + 1}</Text>
-                  </View>
-                  {i < resultado.paradas.length - 1 && <View style={[styles.conector, { borderColor: ACENTO }]} />}
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.tarjetaParada, { backgroundColor: colores.tarjeta, borderColor: colores.borde }]}
-                  onPress={() => router.push(`/hito/${p.id}`)}
-                >
-                  {p.imagenUrl ? (
-                    <Image source={{ uri: p.imagenUrl }} style={styles.miniatura} />
-                  ) : (
-                    <View style={[styles.miniatura, styles.miniaturaVacia, { backgroundColor: cat.color + "22" }]}>
-                      <Ionicons name={cat.icono} size={28} color={cat.color} />
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.nombreParada, { color: colores.texto }]} numberOfLines={2}>
-                      {p.nombre}
-                    </Text>
-                    <View style={styles.filaCategoria}>
-                      <Ionicons name={cat.icono} size={14} color={cat.color} />
-                      <Text style={[styles.textoCategoria, { color: cat.color }]}>{p.categoriaNombre}</Text>
-                    </View>
-                    <Text style={[styles.detalleParada, { color: colores.textoSecundario }]}>{detalle}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={colores.textoSecundario} />
-                </TouchableOpacity>
-              </View>
-            );
-          })}
+          {resultado.paradas.map((p, i) => (
+            <FilaParada
+              key={p.id}
+              parada={p}
+              indice={i}
+              total={resultado.paradas.length}
+              conectarUsuario={resultado.conectarUsuario}
+              colores={colores}
+            />
+          ))}
         </ScrollView>
 
         {/* Total + acciones */}
@@ -710,25 +910,7 @@ export default function RutasScreen() {
               <Ionicons name="play" size={18} color="#fff" style={{ marginRight: 6 }} />
               <Text style={styles.textoBotonPrimario}>Iniciar ruta</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.botonSecundario, guardada && styles.botonGuardada]}
-              onPress={alternarGuardada}
-              disabled={guardando}
-            >
-              {guardando ? (
-                <ActivityIndicator size="small" color={ACENTO} />
-              ) : (
-                <>
-                  <Ionicons
-                    name={guardada ? "heart" : "heart-outline"}
-                    size={18}
-                    color={ACENTO}
-                    style={{ marginRight: 6 }}
-                  />
-                  <Text style={styles.textoBotonSecundario}>{guardada ? "Guardada" : "Guardar ruta"}</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <BotonGuardar guardada={guardada} guardando={guardando} onPress={alternarGuardada} />
           </View>
         </View>
       </View>

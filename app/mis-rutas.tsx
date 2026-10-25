@@ -57,7 +57,7 @@ function estiloCategoria(nombre: string): { color: string; icono: NombreIcono } 
 function formatearFecha(iso: string | null) {
   if (!iso) return "";
   const fecha = new Date(iso);
-  if (isNaN(fecha.getTime())) return "";
+  if (Number.isNaN(fecha.getTime())) return "";
   return fecha.toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
 }
 

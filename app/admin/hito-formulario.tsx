@@ -348,6 +348,19 @@ export default function HitoFormularioScreen() {
         {esEdicion ? "Editar lugar" : "Nuevo lugar"}
       </Text>
 
+      {esEdicion && (
+        <TouchableOpacity
+          style={[styles.botonRA, { borderColor: colores.acentoRA }]}
+          onPress={() => router.push(`/admin/vista-360/${id}`)}
+        >
+          <Ionicons name="sync-outline" size={20} color={colores.acentoRA} />
+          <Text style={[styles.textoBotonRA, { color: colores.acentoRA }]}>
+            Configurar vista 360
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colores.acentoRA} />
+        </TouchableOpacity>
+      )}
+
       {/* Selector de imágenes múltiple */}
       <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>
         Fotos
@@ -641,6 +654,17 @@ const styles = StyleSheet.create({
   contenedor: { flex: 1 },
   centrado: { flex: 1, justifyContent: "center", alignItems: "center" },
   titulo: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
+  botonRA: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  textoBotonRA: { flex: 1, fontSize: 15, fontWeight: "600" },
   etiqueta: { fontSize: 13, fontWeight: "600", marginBottom: 6, marginTop: 4 },
   input: {
     borderWidth: 1,

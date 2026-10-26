@@ -17,6 +17,7 @@ import {
   VERDE_OSCURO,
 } from "@/lib/horarios";
 import { supabase } from "@/lib/supabase";
+import { cargarVistaActiva, VistaPublica360 } from "@/lib/vista360-servicio";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -248,6 +249,22 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
   // Aviso breve de la sección de reseñas
   const [avisoResena, setAvisoResena] = useState<string | null>(null);
 
+  // Vista 360 activa del hito (null = no tiene, no se muestra el botón)
+  const [vista360, setVista360] = useState<VistaPublica360 | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelado = false;
+    cargarVistaActiva(id)
+      .then((vista) => {
+        if (!cancelado) setVista360(vista);
+      })
+      .catch((error) => console.error("Error cargando vista 360:", error));
+    return () => {
+      cancelado = true;
+    };
+  }, [id]);
+
   useEffect(() => {
     async function cargarDatos() {
       if (!id) return;
@@ -465,6 +482,18 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
             onAlternar={() => setDescripcionExpandida(!descripcionExpandida)}
             o={o}
           />
+        )}
+
+        {/* Vista 360: solo si el hito tiene una activa */}
+        {vista360 && (
+          <TouchableOpacity
+            style={[styles.botonVista360, { borderColor: colores.acentoRA }]}
+            onPress={() => router.push(`/vista-360/${hito.id}`)}
+            accessibilityRole="button"
+          >
+            <Ionicons name="sync-outline" size={20} color={colores.acentoRA} />
+            <Text style={[styles.textoVista360, { color: colores.acentoRA }]}>Ver en 360</Text>
+          </TouchableOpacity>
         )}
 
         {/* Tarjeta de feedback contextual "¿Te interesó este hito?" */}
@@ -899,6 +928,17 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 15,
 },
+  botonVista360: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginTop: 16,
+  },
+  textoVista360: { fontSize: 15, fontWeight: "700" },
   card: {
     backgroundColor: "#fff",
     borderRadius: 16,

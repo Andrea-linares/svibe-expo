@@ -363,6 +363,19 @@ export default function HitoFormularioScreen() {
         </TouchableOpacity>
       )}
 
+      {esEdicion && (
+        <TouchableOpacity
+          style={[styles.botonRA, { borderColor: colores.acentoRA }]}
+          onPress={() => router.push(`/admin/vista-360/${id}`)}
+        >
+          <Ionicons name="sync-outline" size={20} color={colores.acentoRA} />
+          <Text style={[styles.textoBotonRA, { color: colores.acentoRA }]}>
+            Configurar vista 360
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colores.acentoRA} />
+        </TouchableOpacity>
+      )}
+
       {/* Selector de imágenes múltiple */}
       <Text style={[styles.etiqueta, { color: colores.textoSecundario }]}>
         Fotos

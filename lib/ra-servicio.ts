@@ -51,10 +51,14 @@ export function rutaDeImagen(imagen: Pick<ImagenHito, "url" | "ruta_storage">) {
 
 // ---- Subida y borrado de archivos ----
 
-// Reduce a 1600 px de ancho como máximo y guarda como JPEG 0.8
-async function comprimir(uri: string, ancho: number | null): Promise<string> {
+// Reduce al ancho máximo (1600 px por defecto) y guarda como JPEG 0.8
+async function comprimir(
+  uri: string,
+  ancho: number | null,
+  anchoMaximo = ANCHO_MAXIMO,
+): Promise<string> {
   const contexto = ImageManipulator.manipulate(uri);
-  if (!ancho || ancho > ANCHO_MAXIMO) contexto.resize({ width: ANCHO_MAXIMO });
+  if (!ancho || ancho > anchoMaximo) contexto.resize({ width: anchoMaximo });
   const imagen = await contexto.renderAsync();
   const resultado = await imagen.saveAsync({
     compress: CALIDAD_JPEG,
@@ -70,11 +74,20 @@ export async function subirFotoRA(
   uriLocal: string,
   anchoOriginal: number | null,
 ) {
-  const uri = await comprimir(uriLocal, anchoOriginal);
+  return subirJpeg(`ar/${hitoId}/${tipo}-${Date.now()}.jpg`, uriLocal, anchoOriginal);
+}
+
+// Comprime y sube una foto local a la ruta indicada del bucket
+export async function subirJpeg(
+  ruta: string,
+  uriLocal: string,
+  anchoOriginal: number | null,
+  anchoMaximo = ANCHO_MAXIMO,
+) {
+  const uri = await comprimir(uriLocal, anchoOriginal, anchoMaximo);
   const base64 = await FileSystem.readAsStringAsync(uri, {
     encoding: FileSystem.EncodingType.Base64,
   });
-  const ruta = `ar/${hitoId}/${tipo}-${Date.now()}.jpg`;
 
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -152,7 +165,7 @@ export async function contarHitosRA() {
 
 // Si la RLS rechaza la escritura, Supabase devuelve 0 filas sin error:
 // por eso se pide la fila de vuelta y se comprueba que exista.
-function exigirFila<T>(data: T[] | null, accion: string): T {
+export function exigirFila<T>(data: T[] | null, accion: string): T {
   if (!data || data.length === 0) {
     throw new Error(`No tienes permiso para ${accion}.`);
   }

@@ -1,4 +1,5 @@
 import FormularioResena from "@/components/FormularioResena";
+import { EstrellasFijas } from "@/components/foro/Estrellas";
 import { COLORES, useTema } from "@/contexts/ThemeContext";
 import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { avisar, confirmar } from "@/lib/confirmar";
@@ -8,13 +9,22 @@ import {
   editarResena,
   eliminarComentario,
   eliminarResena,
+  MiCalificacion,
   obtenerComentariosHito,
-  obtenerResenasHito,
+  obtenerMiCalificacion,
+  obtenerResenasHitoPagina,
+  obtenerResumenCalificacion,
   publicarComentario,
   publicarResena,
   ResenaPublica,
+  ResumenCalificacion,
 } from "@/lib/foro";
-import { agruparPorResena, avisoComentariosAlEliminar, fechaForo } from "@/lib/foro-datos";
+import {
+  agruparPorResena,
+  avisoComentariosAlEliminar,
+  fechaForo,
+  textoValoraciones,
+} from "@/lib/foro-datos";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -22,10 +32,14 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 /* ---------------------------------------------------------------------------
- * Reseñas y comentarios de un hito (HU-018)
- * - Cualquiera (también invitados) ve reseñas y comentarios.
+ * Reseñas y comentarios de un hito (HU-018) con calificación (HU-019)
+ * - Cualquiera (también invitados) ve reseñas, comentarios y el promedio.
  * - Con sesión: escribir reseña (S3-9), comentar, y editar o eliminar lo propio.
  * - Validación de 10–500 caracteres en FormularioResena y en el servidor (S3-10).
+ * - Calificación opcional de 1 a 5 estrellas, una por usuario e hito (índice
+ *   único en la BD). Las respuestas no llevan calificación.
+ * - Se cargan 2 reseñas y luego de 5 en 5 ("Ver más reseñas"); en cada
+ *   reseña se ve la primera respuesta y el resto se despliega.
  * Colores fijos en modo claro; en modo oscuro se usa la paleta de useTema,
  * igual que el resto del detalle del hito.
  * ------------------------------------------------------------------------- */
@@ -60,21 +74,53 @@ type Props = {
   onAviso: (mensaje: string) => void;
 };
 
-async function cargarForo(hitoId: string) {
-  // Las reseñas son lo principal: si fallan los comentarios, se muestran igual
-  const [resenas, comentarios] = await Promise.allSettled([
-    obtenerResenasHito(hitoId),
+const PRIMERA_PAGINA = 2;
+const TAMANO_PAGINA = 5;
+
+async function cargarForo(hitoId: string, cantidad = PRIMERA_PAGINA) {
+  // Las reseñas son lo principal: si fallan comentarios, promedio o la
+  // calificación propia, las reseñas se muestran igual
+  const [pagina, comentarios, resumen, miCalificacion] = await Promise.allSettled([
+    obtenerResenasHitoPagina(hitoId, 0, cantidad - 1),
     obtenerComentariosHito(hitoId),
+    obtenerResumenCalificacion(hitoId),
+    obtenerMiCalificacion(hitoId),
   ]);
-  if (resenas.status === "rejected") throw resenas.reason;
+  if (pagina.status === "rejected") throw pagina.reason;
   if (comentarios.status === "rejected") {
     console.error("Error cargando comentarios:", comentarios.reason);
   }
+  if (resumen.status === "rejected") console.error("Error cargando calificaciones:", resumen.reason);
+  if (miCalificacion.status === "rejected") {
+    console.error("Error cargando tu calificación:", miCalificacion.reason);
+  }
   return {
-    resenas: resenas.value,
+    resenas: pagina.value.resenas,
+    total: pagina.value.total,
     comentarios: comentarios.status === "fulfilled" ? agruparPorResena(comentarios.value) : {},
     errorComentarios: comentarios.status === "rejected",
+    resumen: resumen.status === "fulfilled" ? resumen.value : null,
+    miCalificacion: miCalificacion.status === "fulfilled" ? miCalificacion.value : null,
   };
+}
+
+// Qué muestra el formulario sobre las estrellas (solo en reseñas)
+function calificacionFormulario(
+  formulario: Formulario,
+  mia: MiCalificacion | null,
+): { modo: "editable" | "fija"; valor: number | null } | undefined {
+  switch (formulario.tipo) {
+    case "resena":
+      return mia ? { modo: "fija", valor: mia.valor } : { modo: "editable", valor: null };
+    case "editarResena": {
+      const { resena } = formulario;
+      // La calificación del hito está en otra reseña: aquí no se puede calificar
+      if (mia && mia.id !== resena.id) return { modo: "fija", valor: mia.valor };
+      return { modo: "editable", valor: mia?.id === resena.id ? mia.valor : (resena.calificacion ?? null) };
+    }
+    default:
+      return undefined;
+  }
 }
 
 // Mismo aviso que favoritos cuando no hay sesión; devuelve el id del usuario o null
@@ -190,18 +236,28 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
   const colorIcono = esOscuro ? colores.textoSecundario : GRIS_ICONO;
 
   const [resenas, setResenas] = useState<ResenaPublica[]>([]);
+  // Total de reseñas del hito (no solo las cargadas)
+  const [totalResenas, setTotalResenas] = useState(0);
   const [comentarios, setComentarios] = useState<Record<string, ComentarioPublico[]>>({});
+  const [resumen, setResumen] = useState<ResumenCalificacion | null>(null);
+  const [miCalificacion, setMiCalificacion] = useState<MiCalificacion | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [cargandoMas, setCargandoMas] = useState(false);
   const [error, setError] = useState(false);
   const [errorComentarios, setErrorComentarios] = useState(false);
   const [formulario, setFormulario] = useState<Formulario | null>(null);
+  // Reseñas con todas sus respuestas desplegadas
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
   // Publicación que se está eliminando (evita dobles toques)
   const [eliminando, setEliminando] = useState<string | null>(null);
 
   function aplicar(datos: Awaited<ReturnType<typeof cargarForo>>) {
     setResenas(datos.resenas);
+    setTotalResenas(datos.total);
     setComentarios(datos.comentarios);
     setErrorComentarios(datos.errorComentarios);
+    setResumen(datos.resumen);
+    setMiCalificacion(datos.miCalificacion);
   }
 
   // Carga inicial (mismo patrón que el próximo evento del hito)
@@ -223,12 +279,13 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
     };
   }, [hitoId]);
 
-  // Recarga al reintentar o después de publicar, editar o eliminar
+  // Recarga al reintentar o después de publicar, editar o eliminar.
+  // Mantiene la cantidad de reseñas que ya se habían cargado con "Ver más".
   async function recargar(mostrarCarga = false) {
     if (mostrarCarga) setCargando(true);
     setError(false);
     try {
-      aplicar(await cargarForo(hitoId));
+      aplicar(await cargarForo(hitoId, Math.max(resenas.length, PRIMERA_PAGINA)));
     } catch (e) {
       console.error("Error cargando reseñas:", e);
       setError(true);
@@ -237,11 +294,40 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
     }
   }
 
+  async function verMas() {
+    if (cargandoMas) return;
+    setCargandoMas(true);
+    try {
+      const desde = resenas.length;
+      const pagina = await obtenerResenasHitoPagina(hitoId, desde, desde + TAMANO_PAGINA - 1);
+      setResenas((actuales) => {
+        // Evita duplicados si alguien publicó mientras tanto
+        const ids = new Set(actuales.map((r) => r.id));
+        return [...actuales, ...pagina.resenas.filter((r) => !ids.has(r.id))];
+      });
+      setTotalResenas(pagina.total);
+    } catch (e) {
+      console.error("Error cargando más reseñas:", e);
+      onAviso("No se pudieron cargar más reseñas");
+    } finally {
+      setCargandoMas(false);
+    }
+  }
+
+  function alternarRespuestas(resenaId: string) {
+    setExpandidas((actuales) => {
+      const nuevas = new Set(actuales);
+      if (nuevas.has(resenaId)) nuevas.delete(resenaId);
+      else nuevas.add(resenaId);
+      return nuevas;
+    });
+  }
+
   async function abrir(nuevo: Formulario, accion: string) {
     if (await exigirSesion(accion)) setFormulario(nuevo);
   }
 
-  async function guardar(texto: string) {
+  async function guardar(texto: string, calificacion?: number | null) {
     if (!formulario) return;
     const { data } = await supabase.auth.getUser();
     let mensaje = "";
@@ -249,14 +335,18 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
 
     switch (formulario.tipo) {
       case "resena":
-        await publicarResena(hitoId, texto);
+        await publicarResena(hitoId, texto, calificacion ?? null);
         mensaje = "Tu reseña se publicó";
         esNueva = true;
         break;
-      case "editarResena":
-        await editarResena(formulario.resena.id, texto);
+      case "editarResena": {
+        // Solo se envía la calificación si cambió
+        const inicial = calificacionFormulario(formulario, miCalificacion)?.valor ?? null;
+        const cambio = calificacion !== undefined && calificacion !== inicial ? calificacion : undefined;
+        await editarResena(formulario.resena.id, texto, cambio);
         mensaje = "Tu reseña se actualizó";
         break;
+      }
       case "comentario":
         await publicarComentario(formulario.resena.id, texto);
         mensaje = "Tu comentario se publicó";
@@ -354,6 +444,9 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
 
   function renderResena(resena: ResenaPublica) {
     const lista = comentarios[resena.id] ?? [];
+    const expandida = expandidas.has(resena.id);
+    const visibles = expandida ? lista : lista.slice(0, 1);
+    const ocultas = lista.length - 1;
     return (
       <View key={resena.id} style={[styles.card, o?.card]}>
         <View style={styles.filaAutor}>
@@ -361,6 +454,7 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
             {resena.autor}
             {resena.es_mia ? " (tú)" : ""}
           </Text>
+          {resena.calificacion != null && <EstrellasFijas valor={resena.calificacion} tamano={13} />}
           <Text style={[styles.fecha, o?.textoSecundario]}>
             {fechaForo(resena.creado_en, resena.editado_en)}
           </Text>
@@ -386,7 +480,23 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
         </View>
         <Text style={[styles.texto, o?.texto]}>{resena.contenido}</Text>
 
-        {lista.length > 0 && <View style={styles.listaComentarios}>{lista.map(renderComentario)}</View>}
+        {visibles.length > 0 && (
+          <View style={styles.listaComentarios}>{visibles.map(renderComentario)}</View>
+        )}
+
+        {ocultas > 0 && (
+          <TouchableOpacity
+            style={styles.botonRespuestas}
+            onPress={() => alternarRespuestas(resena.id)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: expandida }}
+            hitSlop={6}
+          >
+            <Text style={[styles.textoRespuestas, o?.textoSecundario]}>
+              {expandida ? "Ocultar respuestas" : `Ver respuestas (${ocultas})`}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={styles.botonComentar}
@@ -405,7 +515,7 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
   // Cargando, error, sin reseñas o la lista de reseñas
   function renderContenido() {
     if (cargando) {
-      return <ActivityIndicator color="#5B8DB8" style={{ marginVertical: 20 }} />;
+      return <ActivityIndicator color={colores.acento} style={{ marginVertical: 20 }} />;
     }
 
     if (error) {
@@ -429,24 +539,63 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
       );
     }
 
+    const restantes = totalResenas - resenas.length;
+
     return (
       <>
+        {renderResumen()}
         {errorComentarios && (
           <Text style={[styles.avisoComentarios, o?.textoSecundario]}>No se pudieron cargar los comentarios.</Text>
         )}
         {resenas.map(renderResena)}
+
+        {restantes > 0 && (
+          <TouchableOpacity
+            style={[styles.botonVerMas, { borderColor: esOscuro ? colores.borde : "#D5DEE8" }]}
+            onPress={verMas}
+            disabled={cargandoMas}
+            accessibilityRole="button"
+          >
+            {cargandoMas ? (
+              <ActivityIndicator size="small" color={colores.acento} />
+            ) : (
+              <Text style={[styles.textoVerMas, { color: colores.acento }]}>
+                Ver más reseñas ({restantes} {restantes === 1 ? "restante" : "restantes"})
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
       </>
     );
   }
 
+  // Promedio de las calificaciones (solo si hay alguna)
+  function renderResumen() {
+    if (!resumen || resumen.total === 0) return null;
+    return (
+      <View
+        style={[styles.card, styles.resumen, o?.card]}
+        accessible
+        accessibilityLabel={`Calificación promedio ${resumen.promedio.toFixed(1).replace(".", ",")} de 5, ${textoValoraciones(resumen.total)}`}
+      >
+        <Text style={[styles.promedio, o?.texto]}>{resumen.promedio.toFixed(1)}</Text>
+        <View style={[styles.separador, { backgroundColor: esOscuro ? colores.borde : "#E0E0E0" }]} />
+        <View style={styles.resumenDetalle}>
+          <EstrellasFijas valor={resumen.promedio} tamano={20} />
+          <Text style={[styles.fecha, o?.textoSecundario]}>({textoValoraciones(resumen.total)})</Text>
+        </View>
+      </View>
+    );
+  }
+
   const textos = formulario ? textosFormulario(formulario, nombreHito) : null;
-  const totalResenas = resenas.length > 0 ? ` (${resenas.length})` : "";
+  const tituloTotal = totalResenas > 0 ? ` (${totalResenas})` : "";
 
   return (
     <View>
       <View style={styles.encabezado}>
         <Text style={[styles.titulo, o?.texto]}>
-          Reseñas{totalResenas}
+          Reseñas{tituloTotal}
         </Text>
         <TouchableOpacity
           style={styles.botonEscribir}
@@ -467,6 +616,7 @@ export default function SeccionResenas({ hitoId, nombreHito, onAviso }: Props) {
           textoInicial={textos.textoInicial}
           textoBoton={textos.textoBoton}
           placeholder={textos.placeholder}
+          calificacion={formulario ? calificacionFormulario(formulario, miCalificacion) : undefined}
           onGuardar={guardar}
           onCerrar={() => setFormulario(null)}
         />
@@ -529,6 +679,22 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   textoComentar: { fontWeight: "600", fontSize: 13 },
+  botonRespuestas: { alignSelf: "flex-start", marginTop: 8, marginLeft: 16, paddingVertical: 4 },
+  textoRespuestas: { fontSize: 12.5, fontWeight: "600", color: "#666" },
+  resumen: { flexDirection: "row", alignItems: "center", gap: 16 },
+  promedio: { fontSize: 36, fontWeight: "bold", color: "#222", fontVariant: ["tabular-nums"] },
+  separador: { width: 1, alignSelf: "stretch" },
+  resumenDetalle: { gap: 4 },
+  botonVerMas: {
+    marginTop: 12,
+    minHeight: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  textoVerMas: { fontWeight: "600", fontSize: 13.5 },
   textoVacio: { fontSize: 14, color: "#666", textAlign: "center", lineHeight: 20 },
   avisoComentarios: { fontSize: 12.5, color: "#777", marginTop: 10 },
   reintentar: { fontWeight: "600", textAlign: "center", marginTop: 10 },

@@ -2,7 +2,56 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { agruparPorResena, avisoComentariosAlEliminar, fechaForo } from "../lib/foro-datos.ts";
+import {
+  agruparPorResena,
+  avisoComentariosAlEliminar,
+  etiquetaEstrellas,
+  fechaForo,
+  formasEstrellas,
+  resumenCalificaciones,
+  textoValoraciones,
+} from "../lib/foro-datos.ts";
+
+describe("resumenCalificaciones", () => {
+  it("calcula el promedio con un decimal", () => {
+    assert.deepEqual(resumenCalificaciones([5, 4, 5]), { promedio: 4.7, total: 3 });
+  });
+
+  it("ignora reseñas sin calificación", () => {
+    assert.deepEqual(resumenCalificaciones([4, null, undefined]), { promedio: 4, total: 1 });
+  });
+
+  it("devuelve total 0 sin valoraciones", () => {
+    assert.deepEqual(resumenCalificaciones([]), { promedio: 0, total: 0 });
+  });
+});
+
+describe("formasEstrellas", () => {
+  it("valores enteros", () => {
+    assert.deepEqual(formasEstrellas(3), ["llena", "llena", "llena", "vacia", "vacia"]);
+  });
+
+  it("media estrella", () => {
+    assert.deepEqual(formasEstrellas(4.6), ["llena", "llena", "llena", "llena", "media"]);
+  });
+
+  it("redondea hacia abajo y hacia arriba", () => {
+    assert.deepEqual(formasEstrellas(4.2), ["llena", "llena", "llena", "llena", "vacia"]);
+    assert.deepEqual(formasEstrellas(4.8), ["llena", "llena", "llena", "llena", "llena"]);
+  });
+});
+
+describe("textos de calificación", () => {
+  it("singular y plural de valoraciones", () => {
+    assert.equal(textoValoraciones(1), "1 valoración");
+    assert.equal(textoValoraciones(124), "124 valoraciones");
+  });
+
+  it("etiqueta accesible", () => {
+    assert.equal(etiquetaEstrellas(3), "3 de 5 estrellas");
+    assert.equal(etiquetaEstrellas(4.6), "4,6 de 5 estrellas");
+  });
+});
 
 describe("fechaForo", () => {
   // Fecha construida en hora local para que la prueba no dependa de la zona horaria

@@ -1,5 +1,7 @@
+import { EstrellasFijas, SelectorEstrellas, useColorEstrella } from "@/components/foro/Estrellas";
 import { COLOR_ACENTO } from "@/constants/theme";
 import { useTema } from "@/contexts/ThemeContext";
+import { Ionicons } from "@expo/vector-icons";
 import {
   contarCaracteres,
   MAX_CARACTERES_RESENA,
@@ -27,8 +29,12 @@ type Props = {
   textoInicial?: string;
   textoBoton: string;
   placeholder?: string;
-  // Debe lanzar un Error con mensaje si no se pudo guardar
-  onGuardar: (texto: string) => Promise<void>;
+  // Solo en reseñas (HU-019): "editable" muestra el selector; "fija" muestra la
+  // calificación que el usuario ya dio en este hito. Sin esta prop no hay estrellas.
+  calificacion?: { modo: "editable" | "fija"; valor: number | null };
+  // Debe lanzar un Error con mensaje si no se pudo guardar.
+  // `calificacion` solo se envía en modo "editable".
+  onGuardar: (texto: string, calificacion?: number | null) => Promise<void>;
   onCerrar: () => void;
 };
 
@@ -40,18 +46,23 @@ export default function FormularioResena({
   textoInicial = "",
   textoBoton,
   placeholder = "Cuenta tu experiencia en este lugar...",
+  calificacion,
   onGuardar,
   onCerrar,
 }: Props) {
   const { colores } = useTema();
+  const dorado = useColorEstrella();
   const [texto, setTexto] = useState(textoInicial);
+  const [estrellas, setEstrellas] = useState<number | null>(calificacion?.valor ?? null);
   const [tocado, setTocado] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
 
+  const editable = calificacion?.modo === "editable";
   const cantidad = contarCaracteres(normalizarResena(texto));
   const errorValidacion = validarResena(texto);
-  const sinCambios = normalizarResena(texto) === normalizarResena(textoInicial);
+  const cambioCalificacion = editable && estrellas !== (calificacion?.valor ?? null);
+  const sinCambios = normalizarResena(texto) === normalizarResena(textoInicial) && !cambioCalificacion;
   const deshabilitado = guardando || errorValidacion !== null || (textoInicial !== "" && sinCambios);
   const mensajeError = errorServidor ?? (tocado ? errorValidacion : null);
   const colorContador = cantidad > MAX_CARACTERES_RESENA ? colores.peligro : colores.textoSecundario;
@@ -62,7 +73,7 @@ export default function FormularioResena({
     setGuardando(true);
     setErrorServidor(null);
     try {
-      await onGuardar(normalizarResena(texto));
+      await onGuardar(normalizarResena(texto), editable ? estrellas : undefined);
     } catch (e: any) {
       setErrorServidor(e?.message ?? "No se pudo guardar la reseña. Inténtalo de nuevo.");
       setGuardando(false);
@@ -87,6 +98,32 @@ export default function FormularioResena({
           <Text style={[styles.titulo, { color: colores.texto }]}>{titulo}</Text>
           {subtitulo && (
             <Text style={[styles.subtitulo, { color: colores.textoSecundario }]}>{subtitulo}</Text>
+          )}
+
+          {calificacion && (
+            <View style={styles.bloqueCalificacion}>
+              <View style={styles.filaEtiqueta}>
+                <Ionicons name="star" size={16} color={dorado} />
+                <Text style={[styles.etiqueta, { color: colores.texto }]}>Calificación (opcional)</Text>
+              </View>
+              {editable ? (
+                <SelectorEstrellas
+                  valor={estrellas}
+                  onCambiar={(valor) => {
+                    setEstrellas(valor);
+                    setErrorServidor(null);
+                  }}
+                  deshabilitado={guardando}
+                />
+              ) : (
+                <View style={styles.filaFija}>
+                  {calificacion.valor !== null && <EstrellasFijas valor={calificacion.valor} tamano={22} />}
+                  <Text style={[styles.yaCalificaste, { color: colores.textoSecundario }]}>
+                    Ya calificaste este hito
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
 
           <TextInput
@@ -170,6 +207,11 @@ const styles = StyleSheet.create({
   },
   titulo: { fontSize: 20, fontWeight: "bold" },
   subtitulo: { fontSize: 14, marginTop: 4 },
+  bloqueCalificacion: { marginTop: 16 },
+  filaEtiqueta: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  etiqueta: { fontSize: 14, fontWeight: "600" },
+  filaFija: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 6 },
+  yaCalificaste: { fontSize: 13 },
   campo: {
     marginTop: 16,
     minHeight: 130,

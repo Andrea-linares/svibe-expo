@@ -1,3 +1,4 @@
+import { resumenCalificaciones } from "@/lib/foro-datos";
 import { supabase } from "@/lib/supabase";
 import { normalizarResena, validarResena } from "@/lib/validacion-resena";
 
@@ -32,6 +33,8 @@ export type ResenaForo = {
   hito_id: string | null;
   contenido: string;
   creado_en: string | null;
+  // 1–5, o null si la reseña no tiene calificación (HU-019)
+  calificacion: number | null;
   autor: AutorForo;
   comentarios: ComentarioForo[];
 };
@@ -45,7 +48,7 @@ export type HitoForo = {
 };
 
 const CAMPOS_RESENA =
-  "id, hito_id, contenido, creado_en, autor:perfiles(nombre, apellido), comentarios:foro_comentarios(id, post_id, contenido, creado_en, autor:perfiles(nombre, apellido))";
+  "id, hito_id, contenido, creado_en, calificacion, autor:perfiles(nombre, apellido), comentarios:foro_comentarios(id, post_id, contenido, creado_en, autor:perfiles(nombre, apellido))";
 
 // Más recientes primero
 function porFechaDesc(a: { creado_en: string | null }, b: { creado_en: string | null }) {
@@ -70,7 +73,13 @@ export type ResenaPublica = {
   editado_en?: string | null;
   autor: string;
   es_mia: boolean;
+  // 1–5, o null si la reseña no tiene calificación (HU-019)
+  calificacion?: number | null;
 };
+
+export type ResumenCalificacion = { promedio: number; total: number };
+
+export type MiCalificacion = { id: string; valor: number };
 
 export type ComentarioPublico = {
   id: string;
@@ -103,12 +112,31 @@ function textoValidado(texto: string) {
   return normalizarResena(texto);
 }
 
-// Traduce la violación del CHECK de longitud a un mensaje para el usuario
+const MENSAJE_YA_CALIFICASTE =
+  "Ya calificaste este hito. Puedes publicar tu reseña sin estrellas o cambiar tu calificación editando tu reseña.";
+
+// Traduce errores de la base de datos a mensajes para el usuario
 function errorDeGuardado(error: { code?: string; message: string }, que = "La reseña") {
   if (error.code === "23514") {
     return new Error(`${que} debe tener entre 10 y 500 caracteres.`);
   }
-  return error;
+  // Índice único uq_foro_posts_una_calificacion: una calificación por usuario e hito
+  if (error.code === "23505") {
+    return new Error(MENSAJE_YA_CALIFICASTE);
+  }
+  // Sin permiso de UPDATE sobre la columna calificacion
+  if (error.code === "42501") {
+    return new Error("No se pudo actualizar la calificación. Inténtalo más tarde.");
+  }
+  return new Error(error.message || "No se pudo guardar. Inténtalo de nuevo.");
+}
+
+function calificacionValida(calificacion: number | null | undefined) {
+  if (calificacion == null) return null;
+  if (!Number.isInteger(calificacion) || calificacion < 1 || calificacion > 5) {
+    throw new Error("La calificación debe ser de 1 a 5 estrellas.");
+  }
+  return calificacion;
 }
 
 async function usuarioActualId() {
@@ -132,6 +160,50 @@ export async function obtenerResenasHito(hitoId: string): Promise<ResenaPublica[
   const { data, error } = await supabase.rpc("obtener_resenas_hito", { p_hito_id: hitoId });
   if (error) throw errorDeLectura(error, "obtener_resenas_hito");
   return (data ?? []) as ResenaPublica[];
+}
+
+// Una página de reseñas (más recientes primero) y el total de reseñas del hito
+export async function obtenerResenasHitoPagina(
+  hitoId: string,
+  desde: number,
+  hasta: number,
+): Promise<{ resenas: ResenaPublica[]; total: number }> {
+  const { data, error, count } = await supabase
+    .rpc("obtener_resenas_hito", { p_hito_id: hitoId }, { count: "exact" })
+    .range(desde, hasta);
+  if (error) throw errorDeLectura(error, "obtener_resenas_hito");
+  const resenas = (data ?? []) as ResenaPublica[];
+  return { resenas, total: count ?? desde + resenas.length };
+}
+
+// Promedio y número de valoraciones del hito (solo reseñas con calificación).
+// Usa la misma función pública que las reseñas: también funciona para invitados.
+export async function obtenerResumenCalificacion(hitoId: string): Promise<ResumenCalificacion | null> {
+  const { data, error } = await supabase
+    .rpc("obtener_resenas_hito", { p_hito_id: hitoId })
+    .select("calificacion")
+    .not("calificacion", "is", null);
+  if (error) throw errorDeLectura(error, "obtener_resenas_hito");
+  const resumen = resumenCalificaciones(
+    ((data ?? []) as { calificacion: number | null }[]).map((r) => r.calificacion),
+  );
+  return resumen.total > 0 ? resumen : null;
+}
+
+// Calificación del usuario actual en el hito (null si no ha calificado o no hay sesión)
+export async function obtenerMiCalificacion(hitoId: string): Promise<MiCalificacion | null> {
+  const { data: sesion } = await supabase.auth.getUser();
+  if (!sesion?.user) return null;
+  const { data, error } = await supabase
+    .from("foro_posts")
+    .select("id, calificacion")
+    .eq("hito_id", hitoId)
+    .eq("usuario_id", sesion.user.id)
+    .not("calificacion", "is", null)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data && data.calificacion != null ? { id: data.id, valor: data.calificacion } : null;
 }
 
 // Comentarios de todas las reseñas de un hito, más antiguos primero
@@ -159,21 +231,26 @@ export async function obtenerMisResenas(): Promise<MiResena[]> {
   return ((data ?? []) as any[]).map((r) => ({ ...r, hito: unico(r.hito) }));
 }
 
-export async function publicarResena(hitoId: string, texto: string) {
+// La calificación es opcional (null = reseña sin estrellas)
+export async function publicarResena(hitoId: string, texto: string, calificacion: number | null = null) {
   const contenido = textoValidado(texto);
+  const valor = calificacionValida(calificacion);
   const usuarioId = await usuarioActualId();
   const { error } = await supabase
     .from("foro_posts")
-    .insert({ hito_id: hitoId, usuario_id: usuarioId, contenido });
+    .insert({ hito_id: hitoId, usuario_id: usuarioId, contenido, calificacion: valor });
   if (error) throw errorDeGuardado(error);
 }
 
-// Solo cambia el texto; la RLS impide editar reseñas de otros usuarios
-export async function editarResena(id: string, texto: string) {
+// Cambia el texto y, si se pasa `calificacion` (incluido null), también la calificación.
+// La RLS impide editar reseñas de otros usuarios.
+export async function editarResena(id: string, texto: string, calificacion?: number | null) {
   const contenido = textoValidado(texto);
+  const cambios: { contenido: string; calificacion?: number | null } = { contenido };
+  if (calificacion !== undefined) cambios.calificacion = calificacionValida(calificacion);
   const { data, error } = await supabase
     .from("foro_posts")
-    .update({ contenido })
+    .update(cambios)
     .eq("id", id)
     .select("id");
   if (error) throw errorDeGuardado(error);

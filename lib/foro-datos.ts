@@ -22,6 +22,41 @@ export function agruparPorResena<T extends { post_id: string }>(comentarios: T[]
   return grupos;
 }
 
+/* ------------------------- Calificaciones (HU-019) ------------------------ */
+
+export type FormaEstrella = "llena" | "media" | "vacia";
+
+// Promedio con un decimal y total de valoraciones (ignora valores fuera de 1–5)
+export function resumenCalificaciones(valores: (number | null | undefined)[]) {
+  const validas = valores.filter((v): v is number => typeof v === "number" && v >= 1 && v <= 5);
+  if (validas.length === 0) return { promedio: 0, total: 0 };
+  const suma = validas.reduce((a, b) => a + b, 0);
+  return { promedio: Math.round((suma / validas.length) * 10) / 10, total: validas.length };
+}
+
+// 5 estrellas: media si la fracción está entre 0.25 y 0.75; desde 0.75 cuenta como llena
+export function formasEstrellas(valor: number): FormaEstrella[] {
+  const enteras = Math.floor(valor);
+  const fraccion = valor - enteras;
+  const llenas = fraccion >= 0.75 ? enteras + 1 : enteras;
+  const media = fraccion >= 0.25 && fraccion < 0.75;
+  return Array.from({ length: 5 }, (_, i) => {
+    if (i < llenas) return "llena";
+    if (i === llenas && media) return "media";
+    return "vacia";
+  });
+}
+
+export function textoValoraciones(total: number) {
+  return total === 1 ? "1 valoración" : `${total} valoraciones`;
+}
+
+// "4.5" → "4,5 de 5 estrellas" (lector de pantalla)
+export function etiquetaEstrellas(valor: number) {
+  const texto = Number.isInteger(valor) ? String(valor) : valor.toFixed(1).replace(".", ",");
+  return `${texto} de 5 estrellas`;
+}
+
 // Texto de confirmación al eliminar una reseña que tiene comentarios
 export function avisoComentariosAlEliminar(totalComentarios: number) {
   if (totalComentarios <= 0) return "";

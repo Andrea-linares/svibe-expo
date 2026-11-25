@@ -1,5 +1,6 @@
 import AccesoRestringido from "@/components/admin/acceso-restringido";
 import AdminHeader from "@/components/admin/admin-header";
+import { EstrellasFijas } from "@/components/foro/Estrellas";
 import { COLOR_ACENTO } from "@/constants/theme";
 import { useTema } from "@/contexts/ThemeContext";
 import { useEsAdmin } from "@/hooks/use-es-admin";
@@ -14,6 +15,7 @@ import {
   obtenerForoAdmin,
   ResenaForo,
 } from "@/lib/foro";
+import { resumenCalificaciones, textoValoraciones } from "@/lib/foro-datos";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -220,13 +222,29 @@ export default function AdminForoScreen() {
       <View key={resena.id} style={[styles.resena, { borderColor: colores.borde }]}>
         <View style={styles.filaPublicacion}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.autor, { color: colores.texto }]}>
-              {nombreAutor(resena.autor)}
-              <Text style={[styles.fecha, { color: colores.textoSecundario }]}>
-                {"  "}
-                {fechaPublicacion(resena.creado_en)}
+            {resena.calificacion != null ? (
+              // Con calificación: nombre, estrellas y fecha (pasan a otra línea si no caben)
+              <View style={styles.filaAutorCalificada}>
+                <Text style={[styles.autor, { color: colores.texto }]}>{nombreAutor(resena.autor)}</Text>
+                <EstrellasFijas
+                  valor={resena.calificacion}
+                  tamano={13}
+                  colorLlena={colores.panelDorado}
+                  colorVacia={colores.panelTextoSecundario}
+                />
+                <Text style={[styles.fecha, { color: colores.textoSecundario }]}>
+                  {fechaPublicacion(resena.creado_en)}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.autor, { color: colores.texto }]}>
+                {nombreAutor(resena.autor)}
+                <Text style={[styles.fecha, { color: colores.textoSecundario }]}>
+                  {"  "}
+                  {fechaPublicacion(resena.creado_en)}
+                </Text>
               </Text>
-            </Text>
+            )}
             <Text style={[styles.contenido, { color: colores.texto }]}>{resena.contenido}</Text>
           </View>
           <BotonEliminar
@@ -328,6 +346,8 @@ export default function AdminForoScreen() {
             const clave = claveHito(item);
             const abierto = abiertos.has(clave);
             const sinPublicaciones = item.resenas.length === 0;
+            // Promedio con las reseñas ya cargadas (se recalcula al eliminar)
+            const valoraciones = resumenCalificaciones(item.resenas.map((r) => r.calificacion));
             return (
               <View style={[styles.tarjeta, { backgroundColor: colores.tarjeta }]}>
                 <TouchableOpacity style={styles.encabezadoHito} onPress={() => alternar(clave)}>
@@ -342,6 +362,17 @@ export default function AdminForoScreen() {
                       {sinPublicaciones
                         ? "Sin publicaciones"
                         : `${pluralizar(item.resenas.length, "reseña", "reseñas")} · ${pluralizar(item.totalComentarios, "comentario", "comentarios")}`}
+                      {valoraciones.total > 0 && (
+                        // Texto anidado: si no cabe, pasa a la línea siguiente
+                        <Text
+                          style={{ color: colores.panelTextoSecundario }}
+                          accessibilityLabel={`Promedio ${valoraciones.promedio.toFixed(1).replace(".", ",")} de 5, ${textoValoraciones(valoraciones.total)}`}
+                        >
+                          {" · "}
+                          <Text style={{ color: colores.panelDorado }}>★</Text>
+                          {` ${valoraciones.promedio.toFixed(1)} · ${textoValoraciones(valoraciones.total)}`}
+                        </Text>
+                      )}
                     </Text>
                   </View>
                   <Ionicons
@@ -415,6 +446,13 @@ const styles = StyleSheet.create({
   resena: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
   filaPublicacion: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   autor: { fontSize: 13, fontWeight: "600" },
+  filaAutorCalificada: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: 8,
+    rowGap: 2,
+  },
   fecha: { fontSize: 11, fontWeight: "400" },
   contenido: { fontSize: 14, marginTop: 3, lineHeight: 19 },
   sinComentarios: { fontSize: 12, marginTop: 6, marginLeft: 14, fontStyle: "italic" },

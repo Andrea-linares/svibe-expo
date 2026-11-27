@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { debeRecargar, ordenarPorIds } from "../lib/sugerencias-orden.ts";
+import { debeRecargar, mezclarDelDia, ordenarPorIds } from "../lib/sugerencias-orden.ts";
 
 const a = { id: "a", nombre: "A" };
 const b = { id: "b", nombre: "B" };
@@ -48,5 +48,34 @@ describe("debeRecargar", () => {
 
   it("al cumplir el intervalo recarga", () => {
     assert.equal(debeRecargar(0, 60000, 60000), true);
+  });
+});
+
+describe("mezclarDelDia", () => {
+  // 36 hitos: los 15 más nuevos al principio, como los devuelve la consulta
+  const hitos = Array.from({ length: 36 }, (_, i) => ({ id: `hito-${i}`, nuevo: i < 15 }));
+
+  it("misma semilla: mismo orden", () => {
+    assert.deepEqual(mezclarDelDia(hitos, "2026-11-27"), mezclarDelDia(hitos, "2026-11-27"));
+  });
+
+  it("otra semilla: otro orden", () => {
+    assert.notDeepEqual(
+      mezclarDelDia(hitos, "2026-11-27").map((h) => h.id),
+      mezclarDelDia(hitos, "2026-11-28").map((h) => h.id),
+    );
+  });
+
+  it("conserva todos los elementos y no modifica la lista", () => {
+    const copia = [...hitos];
+    const mezclados = mezclarDelDia(hitos, "2026-11-27");
+    assert.equal(mezclados.length, hitos.length);
+    assert.deepEqual([...mezclados].sort((a, b) => a.id.localeCompare(b.id)), [...hitos].sort((a, b) => a.id.localeCompare(b.id)));
+    assert.deepEqual(hitos, copia);
+  });
+
+  it("los 10 primeros no son solo los más nuevos", () => {
+    const primeros = mezclarDelDia(hitos, "2026-11-27").slice(0, 10);
+    assert.ok(primeros.some((h) => !h.nuevo));
   });
 });

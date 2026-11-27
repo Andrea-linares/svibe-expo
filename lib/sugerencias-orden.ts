@@ -24,6 +24,29 @@ export function ordenarPorIds<T extends { id: string }>(
   return resultado;
 }
 
+// Hash FNV-1a de 32 bits (para mezclar de forma estable)
+function hashTexto(texto: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < texto.length; i++) {
+    hash ^= texto.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash;
+}
+
+/* Mezcla la lista de forma variada pero estable para una misma semilla
+ * (p. ej. la fecha de hoy): no depende de cuándo se creó cada hito y no
+ * cambia de orden al recargar durante el día. No modifica la lista original. */
+export function mezclarDelDia<T extends { id: string }>(
+  items: readonly T[],
+  semilla: string,
+): T[] {
+  return items
+    .map((item) => ({ item, clave: hashTexto(`${item.id}|${semilla}`) }))
+    .sort((a, b) => a.clave - b.clave || a.item.id.localeCompare(b.item.id))
+    .map(({ item }) => item);
+}
+
 // true si toca volver a pedir las sugerencias (pasó el intervalo mínimo)
 export function debeRecargar(
   ultimaCarga: number | null,

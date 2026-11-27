@@ -1,5 +1,8 @@
 import { BotonTema } from "@/components/BotonTema";
-import TarjetaLugar, { obtenerImagenPrincipal } from "@/components/TarjetaLugar";
+import TarjetaLugar, {
+  obtenerImagenPrincipal,
+  tieneImagen,
+} from "@/components/TarjetaLugar";
 import { COLOR_ACENTO } from "@/constants/theme";
 import { conAlfa, useTema } from "@/contexts/ThemeContext";
 import { useMargenSuperior } from "@/hooks/use-margen-superior";
@@ -11,20 +14,24 @@ import {
   HitoSugerido,
   sugerenciasEnCache,
 } from "@/lib/sugerencias";
+import { mezclarDelDia } from "@/lib/sugerencias-orden";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   Image,
   Modal,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type ScrollViewInstance,
 } from "react-native";
 
 type Hito = {
@@ -81,6 +88,9 @@ const RANGOS_PRECIO = [
 
 const ANCHO_TARJETA_CARRUSEL = 172;
 
+// Lugares imprescindibles que se agregan cada vez que se llega al final
+const TAMANO_PAGINA_LUGARES = 10;
+
 // Guarda la fecha ("YYYY-MM-DD") en que se cerró el aviso de eventos de hoy
 const CLAVE_AVISO_EVENTOS_CERRADO = "aviso_eventos_cerrado";
 
@@ -98,7 +108,15 @@ export default function HomeScreen() {
   const [sugerencias, setSugerencias] = useState<HitoSugerido[] | null>(
     sugerenciasEnCache,
   );
+  // Todos los hitos visibles, mezclados; el feed muestra `cantidadVisible`
+  // y agrega TAMANO_PAGINA_LUGARES más al llegar al final
   const [imprescindibles, setImprescindibles] = useState<Hito[]>([]);
+  const [cantidadVisible, setCantidadVisible] = useState(TAMANO_PAGINA_LUGARES);
+  const [cargandoMas, setCargandoMas] = useState(false);
+  const cargandoMasRef = useRef(false);
+  const [refrescando, setRefrescando] = useState(false);
+  // Sube al jalar para refrescar y vuelve a ejecutar la carga de hitos
+  const [recargasHitos, setRecargasHitos] = useState(0);
   const [preferidos, setPreferidos] = useState<Hito[]>([]);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Hito[] | null>(
     null,
@@ -139,7 +157,8 @@ export default function HomeScreen() {
   const [eventosHoy, setEventosHoy] = useState<Evento[]>([]);
   const [avisoCerrado, setAvisoCerrado] = useState(true);
 
-  const scrollCarruselRef = useRef<ScrollView>(null);
+  // Tipo de la instancia (no del componente): corrige el error de TS en scrollTo
+  const scrollCarruselRef = useRef<ScrollViewInstance>(null);
   const indiceCarruselRef = useRef(0);
   const pausadoRef = useRef(false);
   // true tras la primera carga de hitos (las siguientes no muestran spinner)
@@ -329,17 +348,17 @@ export default function HomeScreen() {
   const listaCarrusel: (Hito & { motivo?: string })[] =
     sugerencias ?? carrusel;
 
+  // Carga los hitos de Inicio. "Jalar para refrescar" la repite subiendo
+  // `recargasHitos`.
   useEffect(() => {
     async function cargarHitos() {
       if (verificandoPreferencias) {
         return;
       }
 
-      // Spinner de pantalla completa solo en la primera carga: en las recargas
-      // (al volver a Inicio) la lista sigue montada y conserva el scroll
-      if (!primeraCargaHechaRef.current) {
-        setCargando(true);
-      }
+      // Spinner de pantalla completa solo en la primera carga (`cargando`
+      // empieza en true y aquí ya no se vuelve a activar): en las recargas la
+      // lista sigue montada y conserva el scroll
 
       try {
         const { data, error } = await supabase
@@ -365,9 +384,16 @@ export default function HomeScreen() {
           return;
         }
 
-        const hitos = (data ?? []) as Hito[];
-        setImprescindibles(hitos.slice(0, 10));
-        setCarrusel(hitos.slice(10, 14));
+        // Todos los hitos visibles, sin repetidos y mezclados de forma
+        // variada (estable durante el día) para "Lugares imprescindibles".
+        // Un hito puede salir también en el carrusel de arriba.
+        const unicos = [
+          ...new Map(((data ?? []) as Hito[]).map((h) => [h.id, h])).values(),
+        ];
+        setImprescindibles(mezclarDelDia(unicos, hoyLocal()));
+        // Respaldo del carrusel (si no hay sugerencias): otra mezcla, para
+        // que no tenga el mismo orden que la lista de abajo
+        setCarrusel(mezclarDelDia(unicos, `${hoyLocal()}-carrusel`).slice(0, 4));
 
         if (usuarioAutenticado && categoriasPreferidas.length > 0) {
           const { data: dataPreferidos } = await supabase
@@ -384,13 +410,16 @@ export default function HomeScreen() {
               `,
             )
             .eq("es_lugar_oculto", false)
-            .in("categoria_id", categoriasPreferidas)
-            .order("creado_en", {
-              ascending: true,
-            })
-            .limit(10);
+            .in("categoria_id", categoriasPreferidas);
 
-          setPreferidos((dataPreferidos ?? []) as Hito[]);
+          // Selección variada entre todos los de sus categorías (antes: los
+          // 10 más antiguos, que dejaban fuera a los nuevos)
+          setPreferidos(
+            mezclarDelDia((dataPreferidos ?? []) as Hito[], hoyLocal()).slice(
+              0,
+              10,
+            ),
+          );
         } else {
           setPreferidos([]);
         }
@@ -399,11 +428,45 @@ export default function HomeScreen() {
       } finally {
         primeraCargaHechaRef.current = true;
         setCargando(false);
+        setRefrescando(false);
       }
     }
 
     cargarHitos();
-  }, [usuarioAutenticado, categoriasPreferidas, verificandoPreferencias]);
+  }, [
+    usuarioAutenticado,
+    categoriasPreferidas,
+    verificandoPreferencias,
+    recargasHitos,
+  ]);
+
+  // Feed de "Lugares imprescindibles": se muestran de 10 en 10 al bajar
+  const lugaresVisibles = imprescindibles.slice(0, cantidadVisible);
+  const hayMasLugares = cantidadVisible < imprescindibles.length;
+
+  function cargarMasLugares() {
+    if (!hayMasLugares || cargandoMasRef.current) return;
+    cargandoMasRef.current = true;
+    setCargandoMas(true);
+    // Los hitos ya están en memoria; la pausa breve deja ver el indicador y
+    // evita que onEndReached agregue varias páginas seguidas
+    setTimeout(() => {
+      setCantidadVisible((actual) => actual + TAMANO_PAGINA_LUGARES);
+      setCargandoMas(false);
+      cargandoMasRef.current = false;
+    }, 300);
+  }
+
+  // Jalar para refrescar: recarga hitos (el efecto de arriba apaga el
+  // indicador al terminar), fuerza las sugerencias y vuelve a la 1.ª página
+  function refrescar() {
+    setRefrescando(true);
+    setCantidadVisible(TAMANO_PAGINA_LUGARES);
+    setRecargasHitos((actual) => actual + 1);
+    cargarSugerencias(true)
+      .then((lista) => setSugerencias(lista))
+      .catch((error) => console.error("Error cargando sugerencias:", error));
+  }
 
   useEffect(() => {
     if (listaCarrusel.length === 0) {
@@ -669,12 +732,47 @@ export default function HomeScreen() {
           )}
         </ScrollView>
       ) : (
-        <ScrollView
+        // Toda la pantalla es una sola FlatList (feed infinito): el carrusel,
+        // "Tus preferencias" y el título van en el encabezado de la lista
+        <FlatList
           style={styles.scroll}
           contentContainerStyle={{
             paddingBottom: 40,
           }}
-        >
+          data={lugaresVisibles}
+          keyExtractor={(hito) => hito.id}
+          renderItem={({ item }) => (
+            <View style={styles.itemLugar}>
+              <TarjetaLugar hito={item} />
+            </View>
+          )}
+          onEndReached={cargarMasLugares}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={refrescando}
+              onRefresh={refrescar}
+              colors={[colores.acento]}
+              tintColor={colores.acento}
+            />
+          }
+          ListFooterComponent={
+            cargandoMas ? (
+              <ActivityIndicator
+                style={styles.pieFeed}
+                size="small"
+                color={colores.acento}
+              />
+            ) : !hayMasLugares && imprescindibles.length > 0 ? (
+              <Text
+                style={[styles.textoPieFeed, { color: colores.textoSecundario }]}
+              >
+                Ya viste todos los lugares
+              </Text>
+            ) : undefined
+          }
+          ListHeaderComponent={
+        <>
           <Text
             style={[
               styles.tituloSeccion,
@@ -752,13 +850,9 @@ export default function HomeScreen() {
           >
             Lugares imprescindibles
           </Text>
-
-          <View style={styles.listaLugares}>
-            {imprescindibles.map((hito) => (
-              <TarjetaLugar key={hito.id} hito={hito} />
-            ))}
-          </View>
-        </ScrollView>
+        </>
+          }
+        />
       )}
 
       {/* MENÚ */}
@@ -1118,7 +1212,11 @@ function TarjetaCarrusel({ hito, motivo }: { hito: Hito; motivo?: string }) {
     >
       <Image
         source={obtenerImagenPrincipal(hito)}
-        style={styles.imagenCarrusel}
+        style={[
+          styles.imagenCarrusel,
+          !tieneImagen(hito) && { backgroundColor: colores.fondo },
+        ]}
+        resizeMode={tieneImagen(hito) ? "cover" : "contain"}
       />
 
       {motivo ? (
@@ -1252,7 +1350,14 @@ function TarjetaGrid({ hito }: { hito: Hito }) {
       ]}
       onPress={() => router.push(`/hito/${hito.id}`)}
     >
-      <Image source={obtenerImagenPrincipal(hito)} style={styles.imagenGrid} />
+      <Image
+        source={obtenerImagenPrincipal(hito)}
+        style={[
+          styles.imagenGrid,
+          !tieneImagen(hito) && { backgroundColor: colores.fondo },
+        ]}
+        resizeMode={tieneImagen(hito) ? "cover" : "contain"}
+      />
 
       <Text
         style={[
@@ -1447,10 +1552,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Lugares imprescindibles: una columna de ancho completo
-  listaLugares: {
+  // Lugares imprescindibles: una columna de ancho completo (feed)
+  itemLugar: {
     paddingHorizontal: 20,
-    gap: 16,
+    marginBottom: 16,
+  },
+
+  pieFeed: {
+    paddingVertical: 16,
+  },
+
+  textoPieFeed: {
+    textAlign: "center",
+    fontSize: 13,
+    paddingVertical: 16,
   },
 
   grid: {

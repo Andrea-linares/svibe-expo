@@ -18,7 +18,14 @@ export type LugarTarjeta = {
   hito_imagenes: { url: string; orden: number }[] | null;
 };
 
-// Imagen principal del lugar (la de menor orden) o el placeholder
+// true si el lugar tiene al menos una foto
+export function tieneImagen(hito: Pick<LugarTarjeta, "hito_imagenes">) {
+  return !!hito.hito_imagenes && hito.hito_imagenes.length > 0;
+}
+
+// Imagen principal del lugar (la de menor orden) o, si no tiene fotos, el
+// logo de SVibe (antes salía el logo de React de la plantilla). El logo se
+// muestra con resizeMode "contain" para que no se recorte.
 export function obtenerImagenPrincipal(hito: Pick<LugarTarjeta, "hito_imagenes">) {
   if (hito.hito_imagenes && hito.hito_imagenes.length > 0) {
     const ordenadas = [...hito.hito_imagenes].sort((a, b) => a.orden - b.orden);
@@ -28,7 +35,7 @@ export function obtenerImagenPrincipal(hito: Pick<LugarTarjeta, "hito_imagenes">
     };
   }
 
-  return require("@/assets/images/partial-react-logo.png");
+  return require("@/assets/images/logo.png");
 }
 
 // null si el lugar no tiene precio (o no se consultó); "Gratis" si es 0
@@ -52,8 +59,11 @@ export default function TarjetaLugar({ hito }: Readonly<{ hito: LugarTarjeta }>)
     >
       <Image
         source={obtenerImagenPrincipal(hito)}
-        style={styles.imagenLugar}
-        resizeMode="cover"
+        style={[
+          styles.imagenLugar,
+          !tieneImagen(hito) && { backgroundColor: colores.fondo },
+        ]}
+        resizeMode={tieneImagen(hito) ? "cover" : "contain"}
       />
 
       <View style={styles.infoLugar}>

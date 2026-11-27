@@ -1,5 +1,6 @@
 import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import { invalidarSugerencias } from "@/lib/sugerencias";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -201,6 +202,7 @@ export default function MisRutasScreen() {
       if (errItems) throw errItems;
       const { error: errRuta } = await supabase.from("rutas").delete().eq("id", ruta.id);
       if (errRuta) throw errRuta;
+      invalidarSugerencias();
       setRutas((actual) => actual.filter((r) => r.id !== ruta.id));
       if (abierta === ruta.id) setAbierta(null);
     } catch (e: any) {

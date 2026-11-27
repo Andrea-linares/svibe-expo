@@ -1,5 +1,6 @@
 import { useTema } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
+import { invalidarSugerencias } from "@/lib/sugerencias";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
@@ -504,6 +505,8 @@ async function quitarRutaGuardada(usuarioId: string, nombre: string) {
   if (errItems) throw errItems;
   const { error: errRutas } = await supabase.from("rutas").delete().in("id", ids);
   if (errRutas) throw errRutas;
+  // Sus hitos pueden volver a sugerirse en Inicio
+  invalidarSugerencias();
 }
 
 // Guarda la ruta (rutas + ruta_items) con sus paradas en orden
@@ -527,6 +530,8 @@ async function guardarRuta(usuarioId: string, nombre: string, paradas: Parada[])
     await supabase.from("rutas").delete().eq("id", ruta.id);
     throw errItems;
   }
+  // Los hitos en rutas del usuario no se sugieren en Inicio
+  invalidarSugerencias();
 }
 
 // Actualiza la lista local de rutas guardadas tras guardar o quitar

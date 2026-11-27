@@ -1,5 +1,6 @@
 import { FavoritosContext } from "@/contexts/FavoritosContext";
 import { supabase } from "@/lib/supabase";
+import { invalidarSugerencias } from "@/lib/sugerencias";
 import { router } from "expo-router";
 import { useCallback, useContext } from "react";
 import { Alert } from "react-native";
@@ -68,6 +69,8 @@ export function useFavoritos() {
             .insert({ usuario_id: usuarioId, hito_id: hitoId });
           if (error && error.code !== CODIGO_DUPLICADO) throw error;
         }
+        // Los favoritos no se sugieren: el carrusel de Inicio debe recargarse
+        invalidarSugerencias();
         return eraFavorito ? "quitado" : "agregado";
       } catch (error) {
         console.error("Error actualizando favorito:", error);

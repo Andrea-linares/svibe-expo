@@ -1,11 +1,16 @@
 import { BotonTema } from "@/components/BotonTema";
 import TarjetaLugar, { obtenerImagenPrincipal } from "@/components/TarjetaLugar";
 import { COLOR_ACENTO } from "@/constants/theme";
-import { useTema } from "@/contexts/ThemeContext";
+import { conAlfa, useTema } from "@/contexts/ThemeContext";
 import { useMargenSuperior } from "@/hooks/use-margen-superior";
 import { Evento, obtenerEventosDeHoy } from "@/lib/eventos";
 import { formatearHora, hoyLocal } from "@/lib/fechas";
 import { supabase } from "@/lib/supabase";
+import {
+  cargarSugerencias,
+  HitoSugerido,
+  sugerenciasEnCache,
+} from "@/lib/sugerencias";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -89,7 +94,12 @@ export default function HomeScreen() {
   const margenEncabezado = useMargenSuperior(55);
   const margenMenu = useMargenSuperior(60);
 
+  // Carrusel de siempre: respaldo si no hay sugerencias
   const [carrusel, setCarrusel] = useState<Hito[]>([]);
+  // Sugerencias personalizadas; null = usar el carrusel de siempre
+  const [sugerencias, setSugerencias] = useState<HitoSugerido[] | null>(
+    sugerenciasEnCache,
+  );
   const [imprescindibles, setImprescindibles] = useState<Hito[]>([]);
   const [preferidos, setPreferidos] = useState<Hito[]>([]);
   const [resultadosBusqueda, setResultadosBusqueda] = useState<Hito[] | null>(
@@ -134,6 +144,8 @@ export default function HomeScreen() {
   const scrollCarruselRef = useRef<ScrollView>(null);
   const indiceCarruselRef = useRef(0);
   const pausadoRef = useRef(false);
+  // true tras la primera carga de hitos (las siguientes no muestran spinner)
+  const primeraCargaHechaRef = useRef(false);
 
   async function cargarPreferencias() {
     try {
@@ -295,13 +307,41 @@ export default function HomeScreen() {
     }, []),
   );
 
+  // Sugerencias: se recargan al volver a Inicio (máx. una vez por minuto,
+  // salvo invalidación). La lista anterior sigue visible mientras carga.
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+
+      cargarSugerencias()
+        .then((lista) => {
+          if (activo) setSugerencias(lista);
+        })
+        .catch((error) => {
+          console.error("Error cargando sugerencias:", error);
+        });
+
+      return () => {
+        activo = false;
+      };
+    }, []),
+  );
+
+  // Lo que muestra el carrusel: sugerencias o, si no hay, lo de siempre
+  const listaCarrusel: (Hito & { motivo?: string })[] =
+    sugerencias ?? carrusel;
+
   useEffect(() => {
     async function cargarHitos() {
       if (verificandoPreferencias) {
         return;
       }
 
-      setCargando(true);
+      // Spinner de pantalla completa solo en la primera carga: en las recargas
+      // (al volver a Inicio) la lista sigue montada y conserva el scroll
+      if (!primeraCargaHechaRef.current) {
+        setCargando(true);
+      }
 
       try {
         const { data, error } = await supabase
@@ -359,6 +399,7 @@ export default function HomeScreen() {
       } catch (error) {
         console.error("Error en cargarHitos:", error);
       } finally {
+        primeraCargaHechaRef.current = true;
         setCargando(false);
       }
     }
@@ -367,7 +408,7 @@ export default function HomeScreen() {
   }, [usuarioAutenticado, categoriasPreferidas, verificandoPreferencias]);
 
   useEffect(() => {
-    if (carrusel.length === 0) {
+    if (listaCarrusel.length === 0) {
       return;
     }
 
@@ -377,7 +418,7 @@ export default function HomeScreen() {
       }
 
       indiceCarruselRef.current =
-        (indiceCarruselRef.current + 1) % carrusel.length;
+        (indiceCarruselRef.current + 1) % listaCarrusel.length;
 
       scrollCarruselRef.current?.scrollTo({
         x: indiceCarruselRef.current * ANCHO_TARJETA_CARRUSEL,
@@ -386,7 +427,7 @@ export default function HomeScreen() {
     }, 3000);
 
     return () => clearInterval(intervalo);
-  }, [carrusel]);
+  }, [listaCarrusel]);
 
   function pausarCarrusel() {
     pausadoRef.current = true;
@@ -664,8 +705,12 @@ export default function HomeScreen() {
               );
             }}
           >
-            {carrusel.map((hito) => (
-              <TarjetaCarrusel key={hito.id} hito={hito} />
+            {listaCarrusel.map((hito) => (
+              <TarjetaCarrusel
+                key={hito.id}
+                hito={hito}
+                motivo={hito.motivo}
+              />
             ))}
           </ScrollView>
 
@@ -1076,7 +1121,7 @@ export default function HomeScreen() {
   );
 }
 
-function TarjetaCarrusel({ hito }: { hito: Hito }) {
+function TarjetaCarrusel({ hito, motivo }: { hito: Hito; motivo?: string }) {
   const { colores } = useTema();
 
   return (
@@ -1093,6 +1138,25 @@ function TarjetaCarrusel({ hito }: { hito: Hito }) {
         source={obtenerImagenPrincipal(hito)}
         style={styles.imagenCarrusel}
       />
+
+      {motivo ? (
+        <View
+          style={[
+            styles.etiquetaMotivo,
+            {
+              backgroundColor: conAlfa(colores.tarjeta, 0.9),
+              borderColor: colores.borde,
+            },
+          ]}
+        >
+          <Text
+            style={[styles.textoMotivo, { color: colores.texto }]}
+            numberOfLines={1}
+          >
+            {motivo}
+          </Text>
+        </View>
+      ) : null}
 
       <Text
         style={[
@@ -1368,6 +1432,23 @@ const styles = StyleSheet.create({
   nombreCarrusel: {
     padding: 8,
     fontWeight: "600",
+  },
+
+  // Etiqueta con el motivo de la sugerencia, sobre la esquina de la imagen
+  etiquetaMotivo: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    maxWidth: 148,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+
+  textoMotivo: {
+    fontSize: 10,
+    fontWeight: "700",
   },
 
   encabezadoPreferencias: {

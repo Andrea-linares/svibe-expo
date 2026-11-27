@@ -1,5 +1,21 @@
 import { useTema } from "@/contexts/ThemeContext";
 import { useMargenSuperior } from "@/hooks/use-margen-superior";
+import { normalizarHora } from "@/lib/fechas";
+import {
+  alternarDia,
+  ATAJOS_DIAS,
+  BloqueHorario,
+  expandirAFilas,
+  FilaHorario,
+  FormHorario,
+  formDesdeFilas,
+  formNuevo,
+  hayCambios,
+  NOMBRE_CORTO_DIA,
+  nuevoBloque,
+  ORDEN_DIAS,
+  validarForm,
+} from "@/lib/horarios-bloques";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { decode } from "base64-arraybuffer";
@@ -23,6 +39,7 @@ import {
 type Categoria = { id: number; nombre: string };
 
 type ImagenExistente = { id: number; url: string; orden: number };
+
 
 export default function HitoFormularioScreen() {
   const { colores } = useTema();
@@ -50,8 +67,53 @@ export default function HitoFormularioScreen() {
   const [resultadosDireccion, setResultadosDireccion] = useState<any[]>([]);
   const [buscandoDireccion, setBuscandoDireccion] = useState(false);
 
-  const [horaApertura, setHoraApertura] = useState("08:00");
-  const [horaCierre, setHoraCierre] = useState("17:00");
+  // Horario en el formulario y filas tal como se cargaron de la BD
+  // (null: lugar nuevo o no se pudieron cargar)
+  const [formHorario, setFormHorario] = useState<FormHorario>(formNuevo);
+  const [filasCargadas, setFilasCargadas] = useState<FilaHorario[] | null>(
+    null,
+  );
+
+  function actualizarHorario(cambios: Partial<FormHorario>) {
+    setFormHorario((actual) => ({ ...actual, ...cambios }));
+  }
+
+  function cambiarPorDia(porDia: boolean) {
+    setFormHorario((actual) => {
+      // Al activarlo con 0 o 1 bloque, empieza con el par actual en todos los días
+      if (porDia && actual.bloques.length <= 1) {
+        return {
+          ...actual,
+          porDia,
+          bloques: [nuevoBloque(ORDEN_DIAS, actual.apertura, actual.cierre)],
+        };
+      }
+      return { ...actual, porDia };
+    });
+  }
+
+  function cambiarBloque(bloque: BloqueHorario) {
+    setFormHorario((actual) => ({
+      ...actual,
+      bloques: actual.bloques.map((b) => (b.id === bloque.id ? bloque : b)),
+    }));
+  }
+
+  function eliminarBloque(id: string) {
+    setFormHorario((actual) => ({
+      ...actual,
+      bloques: actual.bloques.filter((b) => b.id !== id),
+    }));
+  }
+
+  // El bloque nuevo lleva los días que aún no están en ningún bloque
+  function agregarBloque() {
+    setFormHorario((actual) => {
+      const usados = new Set(actual.bloques.flatMap((b) => b.dias));
+      const libres = ORDEN_DIAS.filter((d) => !usados.has(d));
+      return { ...actual, bloques: [...actual.bloques, nuevoBloque(libres)] };
+    });
+  }
 
   // ---- Imágenes ----
   const [imagenesExistentes, setImagenesExistentes] = useState<
@@ -71,16 +133,21 @@ export default function HitoFormularioScreen() {
       setCategorias(cats ?? []);
 
       if (esEdicion) {
-        const { data: horarioExistente } = await supabase
-          .from("horarios_hito")
-          .select("hora_apertura, hora_cierre")
-          .eq("hito_id", id)
-          .limit(1)
-          .maybeSingle();
+        // Todas las filas, en orden de día (antes: una fila cualquiera)
+        const { data: horariosExistentes, error: errorHorarios } =
+          await supabase
+            .from("horarios_hito")
+            .select("dia_semana, hora_apertura, hora_cierre")
+            .eq("hito_id", id)
+            .order("dia_semana", { ascending: true });
 
-        if (horarioExistente) {
-          setHoraApertura(horarioExistente.hora_apertura.slice(0, 5));
-          setHoraCierre(horarioExistente.hora_cierre.slice(0, 5));
+        if (errorHorarios) {
+          // filasCargadas queda en null: al guardar no se toca el horario
+          console.error("Error cargando horarios:", errorHorarios);
+        } else {
+          const filas = (horariosExistentes ?? []) as FilaHorario[];
+          setFilasCargadas(filas);
+          setFormHorario(formDesdeFilas(filas));
         }
 
         const { data: imagenesData } = await supabase
@@ -285,6 +352,21 @@ export default function HitoFormularioScreen() {
       return;
     }
 
+    const errorValidacion = validarForm(formHorario, normalizarHora);
+    if (errorValidacion) {
+      Alert.alert("Horario inválido", errorValidacion);
+      return;
+    }
+
+    // Una fila por día abierto. En edición solo se guarda si el admin cambió
+    // el horario respecto a lo cargado (para no pisar horarios existentes);
+    // si no se pudo cargar, no se toca.
+    const filasNuevas = expandirAFilas(formHorario, normalizarHora);
+    const horarioNoCargado = esEdicion && filasCargadas === null;
+    const guardarHorario =
+      !esEdicion ||
+      (filasCargadas !== null && hayCambios(filasCargadas, filasNuevas));
+
     setGuardando(true);
 
     const { data, error } = await supabase.rpc("admin_guardar_hito", {
@@ -310,24 +392,78 @@ export default function HitoFormularioScreen() {
       return;
     }
 
-    // "data" trae el UUID del hito recién creado/editado (lo devuelve la función RPC)
-    if (imagenesNuevas.length > 0 && data) {
-      await subirImagenesYVincular(data as string);
+    // "data" trae el UUID del hito recién creado/editado (lo devuelve la función RPC).
+    // Si viene vacío, el update no afectó ninguna fila (el lugar no existe).
+    if (!data) {
+      setGuardando(false);
+      Alert.alert(
+        "Error al guardar",
+        esEdicion
+          ? "No se encontró el lugar; no se guardó ningún cambio."
+          : "No se pudo crear el lugar.",
+      );
+      return;
     }
-    if (data) {
-      await supabase.from("horarios_hito").delete().eq("hito_id", data);
+    const hitoId = data as string;
 
-      const filas = [0, 1, 2, 3, 4, 5, 6].map((dia) => ({
-        hito_id: data,
-        dia_semana: dia,
-        hora_apertura: horaApertura,
-        hora_cierre: horaCierre,
-      }));
-
-      await supabase.from("horarios_hito").insert(filas);
+    if (imagenesNuevas.length > 0) {
+      await subirImagenesYVincular(hitoId);
     }
+
+    // Horario: se guarda en el servidor (solo admin) y se vuelve a leer
+    let horarioOk = true;
+    let errorHorario: { message: string } | null = null;
+
+    if (guardarHorario) {
+      const respuesta = await supabase.rpc("admin_guardar_horarios", {
+        p_hito_id: hitoId,
+        p_horarios: filasNuevas,
+      });
+      errorHorario = respuesta.error;
+      horarioOk = !respuesta.error && respuesta.data === filasNuevas.length;
+
+      if (horarioOk) {
+        const { data: releidos, error: errorRelectura } = await supabase
+          .from("horarios_hito")
+          .select("dia_semana, hora_apertura, hora_cierre")
+          .eq("hito_id", hitoId);
+        horarioOk =
+          !errorRelectura &&
+          !hayCambios((releidos ?? []) as FilaHorario[], filasNuevas);
+      }
+    }
+
     setGuardando(false);
-    Alert.alert("Listo", esEdicion ? "Lugar actualizado." : "Lugar creado.");
+
+    if (!horarioOk) {
+      console.error("Error guardando horario:", errorHorario);
+      if (esEdicion) {
+        // Se queda en el formulario para reintentar
+        Alert.alert(
+          "Horario no guardado",
+          `Los demás datos del lugar se guardaron, pero el horario no.${
+            errorHorario ? `\n\n${errorHorario.message}` : ""
+          }`,
+        );
+      } else {
+        // No se queda aquí: reintentar crearía el lugar dos veces
+        Alert.alert(
+          "Horario no guardado",
+          "El lugar se creó, pero el horario no. Ábrelo desde la lista para editarlo.",
+        );
+        router.back();
+      }
+      return;
+    }
+
+    Alert.alert(
+      "Listo",
+      horarioNoCargado
+        ? "Lugar actualizado. El horario no se modificó porque no se pudo cargar."
+        : esEdicion
+          ? "Lugar actualizado."
+          : "Lugar creado.",
+    );
     router.back();
   }
 
@@ -578,24 +714,99 @@ export default function HitoFormularioScreen() {
         <Switch value={esLugarOculto} onValueChange={setEsLugarOculto} />
       </View>
 
-      <View style={styles.fila2}>
-        <View style={{ flex: 1 }}>
-          <Campo
-            etiqueta="Hora de apertura (HH:MM)"
-            valor={horaApertura}
-            onCambio={setHoraApertura}
-            colores={colores}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Campo
-            etiqueta="Hora de cierre (HH:MM)"
-            valor={horaCierre}
-            onCambio={setHoraCierre}
-            colores={colores}
-          />
-        </View>
+      {/* ---- Horario ---- */}
+      <Text style={[styles.tituloSeccion, { color: colores.texto }]}>
+        Horario
+      </Text>
+
+      <View style={[styles.filaSwitch, { marginVertical: 8 }]}>
+        <Text
+          style={[
+            styles.etiqueta,
+            { color: colores.textoSecundario, marginTop: 0 },
+          ]}
+        >
+          Abierto las 24 horas
+        </Text>
+        <Switch
+          value={formHorario.veinticuatro}
+          onValueChange={(valor) => actualizarHorario({ veinticuatro: valor })}
+        />
       </View>
+
+      {!formHorario.veinticuatro && (
+        <>
+          <View style={[styles.filaSwitch, { marginVertical: 8 }]}>
+            <Text
+              style={[
+                styles.etiqueta,
+                { color: colores.textoSecundario, marginTop: 0 },
+              ]}
+            >
+              Horarios diferentes según el día
+            </Text>
+            <Switch value={formHorario.porDia} onValueChange={cambiarPorDia} />
+          </View>
+
+          {formHorario.porDia ? (
+            <>
+              {formHorario.bloques.length === 0 && (
+                <Text
+                  style={[styles.ayuda, { color: colores.textoSecundario }]}
+                >
+                  Este lugar no tiene horario: en el detalle no se muestra.
+                  Agrega un horario para definirlo.
+                </Text>
+              )}
+
+              {formHorario.bloques.map((bloque, indice) => (
+                <EditorBloque
+                  key={bloque.id}
+                  bloque={bloque}
+                  indice={indice}
+                  colores={colores}
+                  onCambio={cambiarBloque}
+                  onEliminar={() => eliminarBloque(bloque.id)}
+                />
+              ))}
+
+              <TouchableOpacity
+                style={[styles.botonAgregarBloque, { borderColor: colores.acento }]}
+                onPress={agregarBloque}
+              >
+                <Ionicons name="add" size={18} color={colores.acento} />
+                <Text style={[styles.textoAgregarBloque, { color: colores.acento }]}>
+                  Agregar otro horario
+                </Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.ayuda, { color: colores.textoSecundario }]}>
+                Los días que no estén en ningún horario se muestran como
+                cerrados.
+              </Text>
+            </>
+          ) : (
+            <View style={styles.fila2}>
+              <View style={{ flex: 1 }}>
+                <Campo
+                  etiqueta="Hora de apertura (HH:MM)"
+                  valor={formHorario.apertura}
+                  onCambio={(valor) => actualizarHorario({ apertura: valor })}
+                  colores={colores}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Campo
+                  etiqueta="Hora de cierre (HH:MM)"
+                  valor={formHorario.cierre}
+                  onCambio={(valor) => actualizarHorario({ cierre: valor })}
+                  colores={colores}
+                />
+              </View>
+            </View>
+          )}
+        </>
+      )}
 
       <TouchableOpacity
         style={styles.botonGuardar}
@@ -611,6 +822,108 @@ export default function HitoFormularioScreen() {
         )}
       </TouchableOpacity>
     </ScrollView>
+  );
+}
+
+// Un bloque de horario: días, horas y "Cerrado"
+function EditorBloque({
+  bloque,
+  indice,
+  colores,
+  onCambio,
+  onEliminar,
+}: {
+  bloque: BloqueHorario;
+  indice: number;
+  colores: any;
+  onCambio: (bloque: BloqueHorario) => void;
+  onEliminar: () => void;
+}) {
+  return (
+    <View style={[styles.bloque, { borderColor: colores.borde, backgroundColor: colores.tarjeta }]}>
+      <View style={styles.encabezadoBloque}>
+        <Text style={[styles.tituloBloque, { color: colores.texto }]}>
+          Horario {indice + 1}
+        </Text>
+        <TouchableOpacity
+          onPress={onEliminar}
+          hitSlop={10}
+          accessibilityLabel={`Eliminar horario ${indice + 1}`}
+        >
+          <Ionicons name="trash-outline" size={20} color={colores.peligro} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Atajos rápidos: reemplazan los días del bloque */}
+      <View style={styles.atajos}>
+        {ATAJOS_DIAS.map((atajo) => (
+          <TouchableOpacity
+            key={atajo.etiqueta}
+            style={[styles.atajo, { borderColor: colores.acento }]}
+            onPress={() =>
+              onCambio({ ...bloque, dias: ORDEN_DIAS.filter((d) => atajo.dias.includes(d)) })
+            }
+          >
+            <Text style={[styles.textoAtajo, { color: colores.acento }]}>
+              {atajo.etiqueta}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.chips}>
+        {ORDEN_DIAS.map((dia) => {
+          const activo = bloque.dias.includes(dia);
+          return (
+            <TouchableOpacity
+              key={dia}
+              style={[styles.chip, activo && styles.chipActivo]}
+              onPress={() => onCambio(alternarDia(bloque, dia))}
+            >
+              <Text style={activo ? styles.chipTextoActivo : styles.chipTexto}>
+                {NOMBRE_CORTO_DIA[dia]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <View style={[styles.filaSwitch, { marginVertical: 4 }]}>
+        <Text
+          style={[
+            styles.etiqueta,
+            { color: colores.textoSecundario, marginTop: 0 },
+          ]}
+        >
+          Cerrado
+        </Text>
+        <Switch
+          value={bloque.cerrado}
+          onValueChange={(valor) => onCambio({ ...bloque, cerrado: valor })}
+        />
+      </View>
+
+      {!bloque.cerrado && (
+        <View style={styles.fila2}>
+          <View style={{ flex: 1 }}>
+            <Campo
+              etiqueta="Apertura (HH:MM)"
+              valor={bloque.apertura}
+              onCambio={(valor) => onCambio({ ...bloque, apertura: valor })}
+              colores={colores}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Campo
+              etiqueta="Cierre (HH:MM)"
+              valor={bloque.cierre}
+              onCambio={(valor) => onCambio({ ...bloque, cierre: valor })}
+              colores={colores}
+            />
+          </View>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -690,6 +1003,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 16,
   },
+  // Horario
+  tituloSeccion: { fontSize: 16, fontWeight: "700", marginTop: 4 },
+  ayuda: { fontSize: 12, marginBottom: 12 },
+  bloque: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  encabezadoBloque: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  tituloBloque: { fontSize: 14, fontWeight: "700" },
+  atajos: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 },
+  atajo: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  textoAtajo: { fontSize: 12, fontWeight: "600" },
+  botonAgregarBloque: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  textoAgregarBloque: { fontSize: 14, fontWeight: "600" },
   botonGuardar: {
     height: 52,
     backgroundColor: "#3B6FA0",

@@ -9,7 +9,9 @@ import { verificarYDesbloquearInsignias } from "@/hooks/use-insignias";
 import { revisarYCompletarRetos } from "@/hooks/use-retos";
 import { Evento, obtenerEventosVigentes } from "@/lib/eventos";
 import { formatearHora, partesFecha } from "@/lib/fechas";
+import { calcularEstado, esHorario24Horas, lineasHorario } from "@/lib/horarios";
 import { supabase } from "@/lib/supabase";
+import { invalidarSugerencias } from "@/lib/sugerencias";
 import { cargarVistaActiva, VistaPublica360 } from "@/lib/vista360-servicio";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -285,10 +287,15 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
         .single();
 
       // 2. Horarios de ese hito
-      const { data: horariosData } = await supabase
+      const { data: horariosData, error: errorHorarios } = await supabase
         .from("horarios_hito")
         .select("dia_semana, hora_apertura, hora_cierre")
-        .eq("hito_id", id);
+        .eq("hito_id", id)
+        .order("dia_semana", { ascending: true });
+
+      if (errorHorarios) {
+        console.error("Error cargando horarios:", errorHorarios);
+      }
 
       // 3. Imágenes de ese hito (carrusel)
       const { data: imagenesData } = await supabase
@@ -362,11 +369,19 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
 
     setFeedbackEnviado(tipo);
 
-    await supabase.from("interacciones_usuario").insert({
+    const { error } = await supabase.from("interacciones_usuario").insert({
       usuario_id: usuarioId,
       hito_id: id,
       tipo_interaccion: tipo,
     });
+
+    if (error) {
+      console.error("Error guardando feedback:", error);
+      return;
+    }
+
+    // "No me interesa" lo saca de las sugerencias de Inicio
+    if (tipo === "no_interesado") invalidarSugerencias();
   }
 
   if (cargando) {
@@ -386,6 +401,8 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
   }
 
   const estado = calcularEstado(horarios);
+  // Abierto 24 horas: la tarjeta de estado ya lo dice, no se muestra la fila
+  const lineasHorarios = esHorario24Horas(horarios) ? [] : lineasHorario(horarios);
 
   const imagenesCarrusel = imagenes.slice(0, MAX_IMAGENES_CARRUSEL);
   const favorito = esFavorito(hito.id);
@@ -516,26 +533,43 @@ const [feedbackEnviado, setFeedbackEnviado] = useState<
           <Text
             style={[
               styles.textoEstado,
-              { color: colorEstado(estado.abierto, esOscuro, colores.peligro) },
+              {
+                color:
+                  estado.tipo === "sin_horario"
+                    ? colores.textoSecundario
+                    : colorEstado(estado.abierto, esOscuro, colores.peligro),
+              },
             ]}
           >
-            {estado.abierto ? "Abierto hoy" : "Cerrado ahora"}
+            {estado.titulo}
           </Text>
-          <Text style={[styles.textoHora, o?.textoSecundario]}>{estado.mensajeHora}</Text>
+          {estado.mensajeHora ? (
+            <Text style={[styles.textoHora, o?.textoSecundario]}>{estado.mensajeHora}</Text>
+          ) : null}
         </View>
 
-        {/* Tarjeta de HORARIOS */}
-        {horarios.length > 0 && (
-        <View style={[styles.card, o?.tarjeta]}>
-          <Text style={[styles.cardTitulo, o?.texto]}>Horarios de atención</Text>
-          {formatearHorarios(horarios).map((item, index) => (
-        <View key={index} style={[styles.filaHorario, o?.separador]}>
-          <Text style={[styles.horarioDia, o?.texto]}>{item.rango}</Text>
-          <Text style={[styles.horarioHora, o?.texto]}>{item.horario}</Text>
-      </View>
-    ))}
-  </View>
-  )}
+        {/* HORARIOS: fila tocable que abre el modal (mismo diseño que Precios) */}
+        {lineasHorarios.length > 0 && (
+          <TouchableOpacity
+            style={[styles.card, o?.tarjeta]}
+            onPress={() => {
+              setTituloModal("Horarios de atención");
+              setTextoModal(
+                lineasHorarios
+                  .map((linea) => `${linea.rango}: ${linea.horario}`)
+                  .join("\n"),
+              );
+              setModalVisible(true);
+            }}
+          >
+            <View style={styles.opcion}>
+              <Text style={[styles.opcionTitulo, o?.texto]}>
+                Horarios de atención
+              </Text>
+              <Text style={[styles.flecha, o?.textoSecundario]}>›</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
        {/* PRECIOS */}
 
@@ -830,32 +864,7 @@ style={[styles.descripcionCard, o?.textoSecundario]}
 }
 
 
-// ---- Lógica de abierto/cerrado (equivalente a tu Calendar.getInstance() de Kotlin) ----
-function calcularEstado(horarios: Horario[]) {
-  const ahora = new Date();
-  const diaActual = ahora.getDay(); // 0=domingo ... 6=sábado (igual que en tu BD)
-  const minutosActuales = ahora.getHours() * 60 + ahora.getMinutes();
-
-  const horarioHoy = horarios.find((h) => h.dia_semana === diaActual);
-
-  if (!horarioHoy) {
-    return { abierto: false, mensajeHora: "Cerrado hoy" };
-  }
-
-  const [horaA, minA] = horarioHoy.hora_apertura.split(":").map(Number);
-  const [horaC, minC] = horarioHoy.hora_cierre.split(":").map(Number);
-  const apertura = horaA * 60 + minA;
-  const cierre = horaC * 60 + minC;
-
-  const abierto = minutosActuales >= apertura && minutosActuales < cierre;
-
-  return {
-    abierto,
-    mensajeHora: abierto
-      ? `Cierra a las ${formatearHora(horarioHoy.hora_cierre)}`
-      : `Abre a las ${formatearHora(horarioHoy.hora_apertura)}`,
-  };
-}
+// La lógica de abierto/cerrado está en lib/horarios.ts (con pruebas)
 
 function nombreDia(dia: number) {
   const dias = [
@@ -870,68 +879,7 @@ function nombreDia(dia: number) {
   return dias[dia];
 }
 
-// ===== FUNCIÓN NUEVA PARA AGRUPAR HORARIOS =====
-function formatearHorarios(horarios: Horario[]) {
-  if (!horarios || horarios.length === 0) {
-    return [{ rango: "Horario no disponible", horario: "" }];
-  }
-
-  // Verificar si es 24/7
-  const es24Horas = horarios.every(h => 
-    h.hora_apertura === "00:00:00" && h.hora_cierre === "23:59:00"
-  );
-
-  if (es24Horas) {
-    return [{ rango: "Todos los días", horario: "24 horas" }];
-  }
-
-  // Agrupar por horario
-  const grupos = new Map<string, number[]>();
-  
-  horarios.forEach(h => {
-    const clave = `${h.hora_apertura}-${h.hora_cierre}`;
-    if (!grupos.has(clave)) {
-      grupos.set(clave, []);
-    }
-    grupos.get(clave)!.push(h.dia_semana);
-  });
-
-  const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-  const resultado: { rango: string; horario: string }[] = [];
-
-  grupos.forEach((dias, clave) => {
-    const [horaApertura, horaCierre] = clave.split("-");
-    const diasOrdenados = dias.sort((a, b) => a - b);
-    
-    // Encontrar rangos consecutivos
-    const rangos: number[][] = [];
-    let inicio = 0;
-    for (let i = 0; i < diasOrdenados.length; i++) {
-      if (i === diasOrdenados.length - 1 || diasOrdenados[i + 1] !== diasOrdenados[i] + 1) {
-        rangos.push(diasOrdenados.slice(inicio, i + 1));
-        inicio = i + 1;
-      }
-    }
-    
-    rangos.forEach(rango => {
-      let rangoTexto = rango.length === 1 
-        ? DIAS[rango[0]]
-        : `${DIAS[rango[0]]} - ${DIAS[rango[rango.length - 1]]}`;
-      
-      // Si cubre todos los días (0-6)
-      if (rango[0] === 0 && rango[rango.length - 1] === 6 && rango.length === 7) {
-        rangoTexto = "Todos los días";
-      }
-      
-      resultado.push({
-        rango: rangoTexto,
-        horario: `${formatearHora(horaApertura)} - ${formatearHora(horaCierre)}`
-      });
-    });
-  });
-
-  return resultado;
-}
+// La lista de horarios del modal está en lib/horarios.ts (lineasHorario)
 
 const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: "#F3F3F3" },

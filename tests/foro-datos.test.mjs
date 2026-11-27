@@ -7,6 +7,8 @@ import {
   avisoComentariosAlEliminar,
   etiquetaEstrellas,
   fechaForo,
+  filtrarPorLugar,
+  normalizarTexto,
   formasEstrellas,
   resumenCalificaciones,
   textoValoraciones,
@@ -95,5 +97,51 @@ describe("avisoComentariosAlEliminar", () => {
   it("usa singular y plural", () => {
     assert.equal(avisoComentariosAlEliminar(1), " También se eliminará su comentario.");
     assert.equal(avisoComentariosAlEliminar(3), " También se eliminarán sus 3 comentarios.");
+  });
+});
+
+describe("normalizarTexto", () => {
+  it("quita tildes, mayúsculas y espacios de los extremos", () => {
+    assert.equal(normalizarTexto("  Laguna de ALEGRÍA "), "laguna de alegria");
+  });
+
+  it("null o undefined → texto vacío", () => {
+    assert.equal(normalizarTexto(null), "");
+    assert.equal(normalizarTexto(undefined), "");
+  });
+});
+
+describe("filtrarPorLugar", () => {
+  const resenas = [
+    { id: "1", hito_id: "a", hito_nombre: "Laguna de Alegría" },
+    { id: "2", hito_id: "b", hito_nombre: "Finca Rauda" },
+    { id: "3", hito_id: "a", hito_nombre: "Laguna de Alegría" },
+    { id: "4", hito_id: "c", hito_nombre: "Finca Rauda Norte" },
+  ];
+
+  it("coincide sin tildes: 'alegria' encuentra 'Laguna de Alegría'", () => {
+    assert.deepEqual(filtrarPorLugar(resenas, "alegria").map((r) => r.id), ["1", "3"]);
+  });
+
+  it("no distingue mayúsculas", () => {
+    assert.deepEqual(filtrarPorLugar(resenas, "FINCA").map((r) => r.id), ["2", "4"]);
+  });
+
+  it("texto vacío devuelve todo", () => {
+    assert.deepEqual(filtrarPorLugar(resenas, "   ").map((r) => r.id), ["1", "2", "3", "4"]);
+  });
+
+  it("sin coincidencias devuelve lista vacía", () => {
+    assert.deepEqual(filtrarPorLugar(resenas, "volcán"), []);
+  });
+
+  it("con hitoId deja solo ese hito aunque otro nombre lo contenga", () => {
+    assert.deepEqual(filtrarPorLugar(resenas, "Finca Rauda", "b").map((r) => r.id), ["2"]);
+  });
+
+  it("no modifica la lista original", () => {
+    const copia = [...resenas];
+    filtrarPorLugar(resenas, "");
+    assert.deepEqual(resenas, copia);
   });
 });

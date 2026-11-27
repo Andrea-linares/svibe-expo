@@ -57,6 +57,29 @@ export function etiquetaEstrellas(valor: number) {
   return `${texto} de 5 estrellas`;
 }
 
+// "Laguna de Alegría " → "laguna de alegria" (sin tildes ni mayúsculas, para buscar)
+export function normalizarTexto(texto: string | null | undefined) {
+  return (texto ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/* Filtra reseñas por lugar. Con hitoId (al tocar el nombre en una tarjeta)
+ * deja solo las de ese hito; si no, busca el texto dentro de hito_nombre.
+ * Texto vacío y sin hitoId devuelve la lista completa. */
+export function filtrarPorLugar<T extends { hito_id: string | null; hito_nombre: string | null }>(
+  resenas: readonly T[],
+  texto: string,
+  hitoId: string | null = null,
+): T[] {
+  if (hitoId) return resenas.filter((r) => r.hito_id === hitoId);
+  const buscado = normalizarTexto(texto);
+  if (!buscado) return [...resenas];
+  return resenas.filter((r) => normalizarTexto(r.hito_nombre).includes(buscado));
+}
+
 // Texto de confirmación al eliminar una reseña que tiene comentarios
 export function avisoComentariosAlEliminar(totalComentarios: number) {
   if (totalComentarios <= 0) return "";

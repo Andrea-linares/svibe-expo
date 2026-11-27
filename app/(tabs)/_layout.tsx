@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 
 import { HapticTab } from "@/components/haptic-tab";
@@ -44,11 +45,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="ra"
+        name="foro"
         options={{
-          title: "RA",
+          title: "Foro",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="camera.fill" color={color} />
+            <Ionicons size={26} name="chatbubbles" color={color} />
           ),
         }}
       />

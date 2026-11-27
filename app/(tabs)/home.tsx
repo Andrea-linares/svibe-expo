@@ -52,9 +52,7 @@ const OPCIONES_MENU = [
   "Retos",
   "Quiz",
   "Niveles",
-  "Sugerencias",
   "Reportar un problema",
-  "Foro",
   "Mis preferencias",
 ];
 
@@ -545,10 +543,6 @@ export default function HomeScreen() {
       router.push("/reportar-problema");
       return;
     }
-    if (opcion === "Foro") {
-      router.push("/foro");
-      return;
-    }
 
     console.log(`Opción seleccionada: ${opcion}`);
   }
@@ -877,18 +871,6 @@ export default function HomeScreen() {
               >
                 Comunidad
               </Text>
-              <ItemMenu
-                icono="chatbubbles-outline"
-                texto="Foro"
-                colores={colores}
-                onPress={() => seleccionarOpcionMenu("Foro")}
-              />
-              <ItemMenu
-                icono="bulb-outline"
-                texto="Sugerencias"
-                colores={colores}
-                onPress={() => seleccionarOpcionMenu("Sugerencias")}
-              />
               <ItemMenu
                 icono="warning-outline"
                 texto="Reportar un problema"
